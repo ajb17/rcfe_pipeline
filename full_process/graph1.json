@@ -1,0 +1,191 @@
+{
+    "groups": [
+        {
+            "name": "Group_00001",
+            "procs": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12
+            ],
+            "total": 13
+        }
+    ],
+    "links": [
+        {
+            "source": 2,
+            "target": 3,
+            "value": 1
+        },
+        {
+            "source": 10,
+            "target": 11,
+            "value": 1
+        },
+        {
+            "source": 3,
+            "target": 11,
+            "value": 1
+        },
+        {
+            "source": 1,
+            "target": 5,
+            "value": 1
+        },
+        {
+            "source": 9,
+            "target": 10,
+            "value": 1
+        },
+        {
+            "source": 1,
+            "target": 10,
+            "value": 1
+        },
+        {
+            "source": 8,
+            "target": 10,
+            "value": 1
+        },
+        {
+            "source": 6,
+            "target": 8,
+            "value": 1
+        },
+        {
+            "source": 7,
+            "target": 8,
+            "value": 1
+        },
+        {
+            "source": 5,
+            "target": 6,
+            "value": 1
+        },
+        {
+            "source": 1,
+            "target": 4,
+            "value": 1
+        },
+        {
+            "source": 7,
+            "target": 9,
+            "value": 1
+        },
+        {
+            "source": 4,
+            "target": 9,
+            "value": 1
+        },
+        {
+            "source": 11,
+            "target": 12,
+            "value": 1
+        },
+        {
+            "source": 0,
+            "target": 1,
+            "value": 1
+        },
+        {
+            "source": 6,
+            "target": 7,
+            "value": 1
+        },
+        {
+            "source": 1,
+            "target": 2,
+            "value": 1
+        }
+    ],
+    "maxN": 13,
+    "nodes": [
+        {
+            "group": 1,
+            "name": "0_file_grabber",
+            "report": "/tmp/tmpFbbPBH/full_process/take_input/_subject_M10999905/file_grabber/_report/report.rst",
+            "result": "/tmp/tmpFbbPBH/full_process/take_input/_subject_M10999905/file_grabber/result_file_grabber.pklz"
+        },
+        {
+            "group": 1,
+            "name": "1_file_unwrapper",
+            "report": "/tmp/tmp4qK2Yi/full_process/take_input/_subject_M10999905/file_unwrapper/_report/report.rst",
+            "result": "/tmp/tmp4qK2Yi/full_process/take_input/_subject_M10999905/file_unwrapper/result_file_unwrapper.pklz"
+        },
+        {
+            "group": 1,
+            "name": "2_warp152",
+            "report": "/tmp/tmp30PDkG/full_process/get_transforms/_subject_M10999905/warp152/_report/report.rst",
+            "result": "/tmp/tmp30PDkG/full_process/get_transforms/_subject_M10999905/warp152/result_warp152.pklz"
+        },
+        {
+            "group": 1,
+            "name": "3_merge",
+            "report": "/tmp/tmp6je4Sm/full_process/get_transforms/_subject_M10999905/merge/_report/report.rst",
+            "result": "/tmp/tmp6je4Sm/full_process/get_transforms/_subject_M10999905/merge/result_merge.pklz"
+        },
+        {
+            "group": 1,
+            "name": "4_skullstrip",
+            "report": "/tmp/tmphCIVIw/full_process/get_transforms/_subject_M10999905/skullstrip/_report/report.rst",
+            "result": "/tmp/tmphCIVIw/full_process/get_transforms/_subject_M10999905/skullstrip/result_skullstrip.pklz"
+        },
+        {
+            "group": 1,
+            "name": "5_mcflirt",
+            "report": "/tmp/tmpVy0J0N/full_process/make_rcfe/_subject_M10999905/mcflirt/_report/report.rst",
+            "result": "/tmp/tmpVy0J0N/full_process/make_rcfe/_subject_M10999905/mcflirt/result_mcflirt.pklz"
+        },
+        {
+            "group": 1,
+            "name": "6_meanimage",
+            "report": "/tmp/tmp5McKxU/full_process/make_rcfe/_subject_M10999905/meanimage/_report/report.rst",
+            "result": "/tmp/tmp5McKxU/full_process/make_rcfe/_subject_M10999905/meanimage/result_meanimage.pklz"
+        },
+        {
+            "group": 1,
+            "name": "7_bet_fmri",
+            "report": "/tmp/tmp53fiGN/full_process/make_rcfe/_subject_M10999905/bet_fmri/_report/report.rst",
+            "result": "/tmp/tmp53fiGN/full_process/make_rcfe/_subject_M10999905/bet_fmri/result_bet_fmri.pklz"
+        },
+        {
+            "group": 1,
+            "name": "8_rcfe",
+            "report": "/tmp/tmpF2tjqD/full_process/make_rcfe/_subject_M10999905/rcfe/_report/report.rst",
+            "result": "/tmp/tmpF2tjqD/full_process/make_rcfe/_subject_M10999905/rcfe/result_rcfe.pklz"
+        },
+        {
+            "group": 1,
+            "name": "9_flirt",
+            "report": "/tmp/tmp1ba2HO/full_process/get_transforms/_subject_M10999905/flirt/_report/report.rst",
+            "result": "/tmp/tmp1ba2HO/full_process/get_transforms/_subject_M10999905/flirt/result_flirt.pklz"
+        },
+        {
+            "group": 1,
+            "name": "10_coreg_to_struct_space",
+            "report": "/tmp/tmpPBVMOS/full_process/get_transforms/_subject_M10999905/coreg_to_struct_space/_report/report.rst",
+            "result": "/tmp/tmpPBVMOS/full_process/get_transforms/_subject_M10999905/coreg_to_struct_space/result_coreg_to_struct_space.pklz"
+        },
+        {
+            "group": 1,
+            "name": "11_coreg_to_template_space",
+            "report": "/tmp/tmpbHC4l5/full_process/get_transforms/_subject_M10999905/coreg_to_template_space/_report/report.rst",
+            "result": "/tmp/tmpbHC4l5/full_process/get_transforms/_subject_M10999905/coreg_to_template_space/result_coreg_to_template_space.pklz"
+        },
+        {
+            "group": 1,
+            "name": "12_isoSmooth",
+            "report": "/tmp/tmpAlKZGH/fmri_to_template/_subject_M10999905/isoSmooth/_report/report.rst",
+            "result": "/tmp/tmpAlKZGH/fmri_to_template/_subject_M10999905/isoSmooth/result_isoSmooth.pklz"
+        }
+    ]
+}

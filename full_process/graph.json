@@ -1,0 +1,109 @@
+[
+    {
+        "group": 1,
+        "imports": [],
+        "name": "00_file_grabber",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "00_file_grabber"
+        ],
+        "name": "01_file_unwrapper",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "01_file_unwrapper"
+        ],
+        "name": "02_warp152",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "02_warp152"
+        ],
+        "name": "03_merge",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "01_file_unwrapper"
+        ],
+        "name": "04_skullstrip",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "01_file_unwrapper"
+        ],
+        "name": "05_mcflirt",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "05_mcflirt"
+        ],
+        "name": "06_meanimage",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "06_meanimage"
+        ],
+        "name": "07_bet_fmri",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "06_meanimage",
+            "07_bet_fmri"
+        ],
+        "name": "08_rcfe",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "07_bet_fmri",
+            "04_skullstrip"
+        ],
+        "name": "09_flirt",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "09_flirt",
+            "01_file_unwrapper",
+            "08_rcfe"
+        ],
+        "name": "10_coreg_to_struct_space",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "10_coreg_to_struct_space",
+            "03_merge"
+        ],
+        "name": "11_coreg_to_template_space",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "11_coreg_to_template_space"
+        ],
+        "name": "12_isoSmooth",
+        "size": 1
+    }
+]

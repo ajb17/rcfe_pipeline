@@ -1,0 +1,38 @@
+digraph structs {
+node [shape=record];
+process_timeseriesgrabber [label="{IN}|{ grabber | io |  }|{OUT|<outstruct> struct|<outtimeseries> time_series}"];
+process_timeseriesunlister [label="{IN|<instruct> struct|<intimeseries> time_series}|{ unlister | utility |  }|{OUT|<outstruct> struct|<outtimeseries> time_series}"];
+process_timeseriesmcflirt [label="{IN|<ininfile> in_file}|{ mcflirt | fsl |  }|{OUT|<outoutfile> out_file}"];
+process_timeseriesmeanimage [label="{IN|<ininfile> in_file}|{ meanimage | fsl |  }|{OUT|<outoutfile> out_file}"];
+process_timeseriesbet [label="{IN|<ininfile> in_file}|{ bet | fsl |  }|{OUT|<outmaskfile> mask_file|<outoutfile> out_file}"];
+process_timeserieszscale [label="{IN|<ininputimage> input_image|<inmaskimage> mask_image}|{ zscale | utility |  }|{OUT|<outoutputimage> output_image}"];
+process_timeseriesskullstrip [label="{IN|<ininfile> in_file}|{ skullstrip | afni |  }|{OUT|<outoutfile> out_file}"];
+process_timeseriesflirt [label="{IN|<ininfile> in_file|<inreference> reference}|{ flirt | fsl |  }|{OUT|<outoutfile> out_file|<outoutmatrixfile> out_matrix_file}"];
+process_timeseriescoreg [label="{IN|<ininfile> in_file|<ininmatrixfile> in_matrix_file|<inreference> reference}|{ coreg | fsl |  }|{OUT|<outoutfile> out_file}"];
+process_timeserieswarp152 [label="{IN|<ininputimage> input_image}|{ warp152 | ants |  }|{OUT|<outaffinetransformation> affine_transformation|<outoutputfile> output_file|<outwarpfield> warp_field}"];
+process_timeseriesdataSink [label="{IN|<inflrt> flrt|<inwarp152> warp152}|{ dataSink | io |  }|{OUT}"];
+process_timeseriesmerge [label="{IN|<inin1> in1|<inin2> in2}|{ merge | utility |  }|{OUT|<outout> out}"];
+process_timeseriescoreg2 [label="{IN|<ininputimage> input_image|<intransforms> transforms}|{ coreg2 | ants |  }|{OUT|<outoutputimage> output_image}"];
+process_timeseriesisoSmooth [label="{IN|<ininfile> in_file}|{ isoSmooth | fsl |  }|{OUT}"];
+process_timeseriesbet:outmaskfile:e -> process_timeserieszscale:inmaskimage:w;
+process_timeseriesbet:outoutfile:e -> process_timeseriesflirt:ininfile:w;
+process_timeseriescoreg2:outoutputimage:e -> process_timeseriesisoSmooth:ininfile:w;
+process_timeseriescoreg:outoutfile:e -> process_timeseriescoreg2:ininputimage:w;
+process_timeseriesflirt:outoutfile:e -> process_timeseriesdataSink:inflrt:w;
+process_timeseriesflirt:outoutmatrixfile:e -> process_timeseriescoreg:ininmatrixfile:w;
+process_timeseriesgrabber:outstruct:e -> process_timeseriesunlister:instruct:w;
+process_timeseriesgrabber:outtimeseries:e -> process_timeseriesunlister:intimeseries:w;
+process_timeseriesmcflirt:outoutfile:e -> process_timeseriesmeanimage:ininfile:w;
+process_timeseriesmeanimage:outoutfile:e -> process_timeseriesbet:ininfile:w;
+process_timeseriesmeanimage:outoutfile:e -> process_timeserieszscale:ininputimage:w;
+process_timeseriesmerge:outout:e -> process_timeseriescoreg2:intransforms:w;
+process_timeseriesskullstrip:outoutfile:e -> process_timeseriesflirt:inreference:w;
+process_timeseriesunlister:outstruct:e -> process_timeseriescoreg:inreference:w;
+process_timeseriesunlister:outstruct:e -> process_timeseriesskullstrip:ininfile:w;
+process_timeseriesunlister:outstruct:e -> process_timeserieswarp152:ininputimage:w;
+process_timeseriesunlister:outtimeseries:e -> process_timeseriesmcflirt:ininfile:w;
+process_timeserieswarp152:outaffinetransformation:e -> process_timeseriesmerge:inin2:w;
+process_timeserieswarp152:outoutputfile:e -> process_timeseriesdataSink:inwarp152:w;
+process_timeserieswarp152:outwarpfield:e -> process_timeseriesmerge:inin1:w;
+process_timeserieszscale:outoutputimage:e -> process_timeseriescoreg:ininfile:w;
+}

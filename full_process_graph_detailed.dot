@@ -1,0 +1,19 @@
+digraph structs {
+node [shape=record];
+fmri_to_templateget_transforms [label="{IN}|{ get_transforms |  |  }|{OUT|<outcoregtotemplatespaceoutputimage> coreg_to_template_space.output_image}"];
+fmri_to_templateisoSmooth [label="{IN|<ininfile> in_file}|{ isoSmooth | fsl |  }|{OUT}"];
+full_processtake_input [label="{IN}|{ take_input |  |  }|{OUT|<outfileunwrapperstruct> file_unwrapper.struct|<outfileunwrappertimeseries> file_unwrapper.time_series}"];
+make_rcfemcflirt [label="{IN|<ininfile> in_file}|{ mcflirt | fsl |  }|{OUT}"];
+get_transformsskullstrip [label="{IN|<ininfile> in_file}|{ skullstrip | afni |  }|{OUT}"];
+get_transformswarp152 [label="{IN|<ininputimage> input_image}|{ warp152 | ants |  }|{OUT}"];
+full_processmake_rcfe [label="{IN}|{ make_rcfe |  |  }|{OUT|<outbetfmrioutfile> bet_fmri.out_file|<outrcfeoutputimage> rcfe.output_image}"];
+get_transformscoreg_to_struct_space [label="{IN|<ininfile> in_file|<inreference> reference}|{ coreg_to_struct_space | fsl |  }|{OUT}"];
+get_transformsflirt [label="{IN|<ininfile> in_file}|{ flirt | fsl |  }|{OUT}"];
+fmri_to_templateget_transforms:outcoregtotemplatespaceoutputimage:e -> fmri_to_templateisoSmooth:ininfile:w;
+full_processmake_rcfe:outbetfmrioutfile:e -> get_transformsflirt:ininfile:w;
+full_processmake_rcfe:outrcfeoutputimage:e -> get_transformscoreg_to_struct_space:ininfile:w;
+full_processtake_input:outfileunwrapperstruct:e -> get_transformscoreg_to_struct_space:inreference:w;
+full_processtake_input:outfileunwrapperstruct:e -> get_transformsskullstrip:ininfile:w;
+full_processtake_input:outfileunwrapperstruct:e -> get_transformswarp152:ininputimage:w;
+full_processtake_input:outfileunwrappertimeseries:e -> make_rcfemcflirt:ininfile:w;
+}

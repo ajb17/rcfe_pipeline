@@ -1,0 +1,18 @@
+1) fMRI timeseries >----------------------------------------------------------------------------------------------------------|
+2) T1 Structural Image                                                                                                        |
+3) template image   >---------------------------------------------------------------------------------------------------------|
+                                                                                                                              |
+processing:                                                                                                                   |                                                                                               |
+1) motion correction (mcflrt); >-|                                                                                            |
+ |-<compute mean (fslmaths); <---|                                                                                            |
+ |->skull strip (BET);                                                                                                        |
+ |  scaling within mask: zscale (python code or fslstats + fslmaths),multiply by -1 = rcFe;                                   |    # AvScale???  Slicer???
+ |  coregister mean fMRI to skullstripped T1 (FLIRT) >-|                                  V                                   |
+  \                                                    |                                  |                                   |
+2) skull strip (afni 3dSkullStrip); <------------------|                                  |                                   |
+    warp whole head (not skull stripped) T1 to MNI 152 |T1 2mm template (ANTS). <---------|-----------------------------------|
+                                             __________|_________V                        |
+                                                              |___________________________|
+                                                              V
+3) apply combined coregistration from fMRI to T1 to MNI Template to rcFe (ANTS); >-|
+    apply spatial smoothing (4mm iso gaussian; fslmaths). <------------------------|

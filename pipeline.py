@@ -30,8 +30,8 @@ ap = argparse.ArgumentParser()
 ap.add_argument('-sub', '--subject', required=False, help='You can specify a single subject to analyze here')
 
 group = ap.add_mutually_exclusive_group(required=True)
-group.add_argument('-temp', '--temp', help='The path to the template you are fitting your images to')
-group.add_argument('-temp2', '--temp2', help='The path the a premade template that can fit an fmri time series to a structural space')
+group.add_argument('-t1_temp', '--t1_temp', help='The path to the template you are fitting your images to')
+group.add_argument('-epi_temp', '--epi_temp', help='The path the a premade template that can fit an fmri time series to a structural space')
 
 #ap.add_argument('-temp', '--temp', required=True, help='The path to the template you are fitting your images to')
 ap.add_argument('-d', '--directory', required=True, help='The directory that your subjects are all found in')
@@ -136,8 +136,12 @@ processing:
     apply spatial smoothing (4mm iso gaussian; fslmaths).
 """
 
-
-template = os.path.abspath(args['temp'])
+if args['t1_temp'] is not None:
+    template = os.path.abspath(args['t1_temp'])
+else:
+    template = os.path.abspath(args['epi_temp'])
+    #template = ""
+    print("set up other temp")
 
 # 1_______________________
 # Motion correction on fmri time series
@@ -192,7 +196,7 @@ skullstrip_structural = Node(SkullStrip(outputtype='NIFTI'), name='skullstrip')
 # process_timeseries.connect(imagestats,'out_file', skullstrip, 'in_file')
 
 # Warp whole head T1 Structural Image to MNI 152 template
-warp_to_152 = Node(legacy.GenWarpFields(reference_image=template), name="warp152")
+warp_to_152 = Node(legacy.GenWarpFields(reference_image=template, similarity_metric="CC"), name="warp152")
 
 
 # 3______________________
@@ -210,7 +214,10 @@ dataSink = Node(nio.DataSink(base_directory="results_dir", container='warp152_ou
 
 
 # Default process
+
 base_dir = os.path.abspath("/projects/abeetem/results")#"fmriPipeline")
+if args['epi_temp'] is not None:
+    base_dir = os.path.abspath('/projects/abeetem/results2')
 process_timeseries = Workflow(name="process_timeseries"
                               , base_dir=base_dir)
 '''
@@ -258,9 +265,6 @@ process_timeseries.connect([
 #process_timeseries.run('MultiProc', plugin_args={'n_procs':20})
 
 
-# Second processsing Option
-
-reg_fmri_temp = Node(Registration(), name='fmri-to-temp')
 
 
 accept_input = Workflow(name='take_input')
@@ -275,31 +279,36 @@ make_rcfe.connect(mcflirt, 'out_file', mean_fmri, 'in_file')
 make_rcfe.connect(mean_fmri, 'out_file', bet_fmri, 'in_file')
 make_rcfe.connect(mean_fmri, 'out_file', rcfe, 'input_image')
 make_rcfe.connect(bet_fmri, 'mask_file', rcfe, 'mask_image')
-#todo: output node?
+
 
 
 
 #get fmri to template space
 #get_transforms_output = Node()
-get_transforms = Workflow(name="get_transforms")
+get_transforms_t1 = Workflow(name="get_transforms_t1")
 ### get_transforms.connect(accept_input, 'file_unwrapper.struct', warp_to_152, 'input_image')
 ### get_transforms.connect(accept_input, 'file_unwrapper.struct', skullstrip_structural, 'in_file')
 ### get_transforms.connect(accept_input, 'file_unwrapper.struct', coreg_to_struct_space, 'reference')
 
-get_transforms.connect(skullstrip_structural, 'out_file', flirt, 'reference')
+get_transforms_t1.connect(skullstrip_structural, 'out_file', flirt, 'reference')
 ### get_transforms.connect(make_rcfe, 'bet_fmri.out_file', flirt, 'in_file')
 
-get_transforms.connect(flirt ,'out_matrix_file', coreg_to_struct_space, 'in_matrix_file')
+get_transforms_t1.connect(flirt, 'out_matrix_file', coreg_to_struct_space, 'in_matrix_file')
 ### get_transforms.connect(make_rcfe, 'rcfe.output_image', coreg_to_struct_space, 'in_file')
-get_transforms.connect(coreg_to_struct_space, 'out_file', coreg_to_template_space, 'input_image')
+get_transforms_t1.connect(coreg_to_struct_space, 'out_file', coreg_to_template_space, 'input_image')
 #get_transforms.connect(accept_input, 'file_unwrapper.struct', warp_to_152, 'input_image')
-get_transforms.connect([(warp_to_152, merge_transforms_node, [('affine_transformation', 'in2'), ('warp_field', 'in1')])])
-get_transforms.connect(merge_transforms_node, 'out', coreg_to_template_space, 'transforms')
+get_transforms_t1.connect([(warp_to_152, merge_transforms_node, [('affine_transformation', 'in2'), ('warp_field', 'in1')])])
+get_transforms_t1.connect(merge_transforms_node, 'out', coreg_to_template_space, 'transforms')
 
 
 
-
-
+# Second processsing Option
+reg_fmri_temp = Node(legacy.GenWarpFields(reference_image=template), name='fmri_to_temp')#Registration(fixed_image=template), name='fmri-to-temp')
+apply_epi_temp = Node(ApplyTransforms(reference_image=template), name='bet_epi_to_temp')
+merge_epi_transforms = Node(Merge(2), iterfield='in2', name='merge_epi')
+get_transforms_epi = Workflow(name="get_transforms_epi")
+get_transforms_epi.connect([(reg_fmri_temp, merge_epi_transforms, [('affine_transformation', 'in2'),  ('warp_field', 'in1')])])
+get_transforms_epi.connect(merge_epi_transforms, 'out', apply_epi_temp, 'transforms')
 
 # smooth_rcfe = Workflow(name='smooth rcfe')
 # smooth_rcfe.connect()
@@ -329,14 +338,31 @@ full_process.connect([(accept_input, mcflirt, [('file_unwrapper.time_series', 'i
                       (accept_input, coreg_to_struct_space, [('file_unwrapper.struct', 'reference')])
                      ])
 
-if args['temp2'] is not None:
-    full_process.connect(make_rcfe, 'rcfe.output_image', reg_fmri_temp, 'fixed_image')
-    full_process.connect(reg_fmri_temp, 'warped_iamge', isoSmooth, 'in_file')
-else:
-    full_process.connect(get_transforms, 'coreg_to_template_space.output_image', isoSmooth, 'in_file')
 
-#full_process.run()
+
+
+if args['epi_temp'] is not None:
+    # Is it the input fmri file or the mean image produced from it???
+    full_process.connect(accept_input, 'file_unwrapper.time_series', reg_fmri_temp, 'input_image')
+    #full_process.connect([(reg_fmri_temp, merge_epi_transforms, [('affine_transformation', 'in2'),  ('warp_field', 'in1')])])
+    #full_process.connect(merge_epi_transforms, 'out', apply_epi_temp, 'transforms')
+    full_process.connect(make_rcfe, 'rcfe.output_image', apply_epi_temp, 'input_image')
+    full_process.connect(apply_epi_temp, 'output_image', isoSmooth, 'in_file')
+
+
+    # full_process.connect(make_rcfe, 'rcfe.output_image', reg_fmri_temp, 'fixed_image')
+    # full_process.connect(reg_fmri_temp, 'warped_image', isoSmooth, 'in_file')
+    print('used other template')
+
+else:
+
+    full_process.connect(get_transforms_t1, 'coreg_to_template_space.output_image', isoSmooth, 'in_file')
+    print('used default template')
+
+
+full_process.run()
 # full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_shortcut', format='svg')
 # full_process.disconnect(make_rcfe, 'rcfe.output_image', isoSmooth, 'in_file')
 # full_process.connect(get_transforms, 'coreg_to_template_space.output_image', isoSmooth, 'in_file')
-full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_default', format='svg')
+#full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_default', format='svg')
+full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_other', format='svg')

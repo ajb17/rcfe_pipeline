@@ -18,6 +18,8 @@ ap.add_argument('-ses', '--session', required=False, help='The session to look f
 ap.add_argument('-acq', '--acquisition', required=False, help='The acquisition to look for in both T1 and fmri files')
 ap.add_argument('-task', '--task', required=False, help='The task to look for in both T1 and fmri files')
 
+ap.add_argument('-subs', '--subjects', required=False, help='An iterables source of multiple subjects')
+
 
 args = vars(ap.parse_args())
 
@@ -89,11 +91,13 @@ pf = Workflow(name='workflow')
 pf.connect(file_grabber, 'struct', print_file_node, 'struct')
 pf.connect(file_grabber, 'time_series', print_file_node, 'ts')
 
-pf.run('MultiProc', plugin_args={'n_procs':20})
+pf.run('MultiProc', plugin_args={'n_procs':10})
 
 # try:
 #     pf.run('MultiProc', plugin_args={'n_procs':20})
 # except (IOError, RuntimeError):
 #     print("got the error")
+
+
 
 

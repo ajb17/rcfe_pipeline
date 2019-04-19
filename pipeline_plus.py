@@ -213,7 +213,7 @@ warp_to_152 = Node(legacy.GenWarpFields(reference_image=template, similarity_met
 
 # 3______________________
 # coreg_to_struct_space = Node(FLIRT(apply_xfm=True, reference=struct_image, interp="sinc"), name="coreg")
-coreg_to_struct_space = Node(FLIRT(apply_xfm=True, interp="sinc"), name="coreg_to_struct_space")
+coreg_to_struct_space = Node(FLIRT(apply_xfm=True, interp="sinc", cost='mutualinfo'), name="coreg_to_struct_space")
 
 coreg_to_template_space = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), name="coreg_to_template_space")
 merge_transforms_node = Node(Merge(2), iterfield=['in2'], name="merge")
@@ -252,6 +252,7 @@ if args['t1_temp']:
 
 else:
     # Second processsing Option
+    #TODO: instead of giving the reference imageges immeeadly, we may want to pass them in from the file grabber for more clarity in the diagram
     reg_fmri_temp = Node(legacy.GenWarpFields(reference_image=template), name='fmri_to_temp')#Registration(fixed_image=template), name='fmri-to-temp')
     apply_epi_temp = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), name='apply_epi_transforms')
     merge_epi_transforms = Node(Merge(2), iterfield='in2', name='merge_epi')
@@ -265,9 +266,9 @@ else:
 
 base_dir_string = "/projects/abeetem/results/pipelineplus"
 if args['t1_temp'] is not None:
-    base_dir_string = base_dir_string + '/default'
+    base_dir_string = base_dir_string + '/t1_reg'
 else:
-    base_dir_string = base_dir_string + '/other'
+    base_dir_string = base_dir_string + '/epi_reg'
 
 base_dir = os.path.abspath(base_dir_string)
 full_process = Workflow(name='full_process', base_dir=base_dir)
@@ -297,7 +298,7 @@ else:
 
 
 
-full_process.run('MultiProc', plugin_args={'n_procs':10})
+full_process.run('MultiProc', plugin_args={'n_procs':20})
 if False:
     if args['t1_temp'] is not None:
         full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_T1', format='svg')

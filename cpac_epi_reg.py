@@ -39,12 +39,13 @@ ap.add_argument('-sub_list', '--sub_list', required=False, help='The list of sub
 ap.add_argument('-ses_list', '--ses_list', required=False, help='The list of sessions to itereate through')
 ap.add_argument('-d', '--directory', required=False, help='The directory to searchh for subject, session pairs')
 ap.add_argument('-r', '--results_dir', required=True, help='where to store the results')
+ap.add_argument('-der', '--derivatives', required=True, help='The text file containg the derivate path templates')
 args = vars(ap.parse_args())
 
 
 # TODO: What is the input type for images?
 # we should end up wiht a list of image paths at least
-
+'''
 #TODO: split up the mean image and the derivatice image findin into tow funcitons instead
 def path_generator(sub, ses=None):
     import os
@@ -74,15 +75,36 @@ def reho_path(sub, ses):
 def res_filt_path(sub, ses):
     return abspath("/projects/cgutierrez/rockland_sample_cpac/All_Outputs/{}_{}/alff_img/_scan_rest_acq-1400/_compcor_ncomponents_5_selector_pc10.linear1.wm0.global1.motion1.quadratic1.gm0.compcor1.csf0/_hp_0.01/_lp_0.1/residual_filtered_3dT.nii.gz".format(sub[1:], ses))
     #TODO: should i thorw an error if no file is found, or is this an expected thing?
+'''
+# This creates the templates and template arguments that are accepted by Nipype's data grabber
+def parse_template_entry(entry):
+    key = entry[:min(entry.find(' '), entry.find('='))]
+    first_quote_index = entry.find('"')
+    second_quote_index = entry.find('"', first_quote_index+1)
+    template = entry[first_quote_index+1: second_quote_index]
+    args = [arg for arg in entry[second_quote_index+1:].split(',') if arg is not '']
+    return key, template, args
 
+# This is where we build up the dictionaries of templates and arguments for the nipype data grabber
+temps = {}
+ars = {}
+for i in open(args['derivatives'], 'r'):
+    if i is '' or i == '\n':
+        continue
+    key, temp, targs = parse_template_entry(i)
+    temps[key] = temp.rstrip("\n")
+    ars[unicode(key)] = [[arg.rstrip('\n').lstrip(' ') for arg in targs if arg is not '']]
+    #TODO: this would probably be a little more efficient to do it as we create the list if possible
 
+'''
 if args['starter'] is not None:
     start_images = [args['starter']]
 elif args['sub_list'] is not None and args['ses_list'] is not None:
     start_images = [path_generator(sub, ses) for sub in args['sub_list'] for ses in args['ses_list']]
-
+'''
 
 template = abspath(args['template'])
+'''
 if args['images'] is not None:
     image_paths = args['images']
 elif args['image_path_source'] is not None:
@@ -93,7 +115,7 @@ elif args['sub_list'] is not None and args['ses_list'] is not None:
     image_paths = [path for list in image_paths_lists for path in list]
 else:
     raise Exception("Should specify images as either a list of image paths, or an iterable source of image paths, such as a textfile, or specify a list of subjects and sessions and directory to search through")
-
+'''
 
 if args['sub_list'] is not None:
     if args['ses_list'] is None:
@@ -102,14 +124,15 @@ if args['sub_list'] is not None:
     ses_list = args['ses_list']
 sub_list = [sub.rstrip('\n') for sub in open(args['sub_list'], 'r')]
 ses_list = [ses.rstrip('\n') for ses in open(args['ses_list'], 'r')]
+'''
 sub_ses_dict = None
 if args['sub_list'] is not None and args['ses_list'] is not None:
     #sub_ses_dict = {"{}_{}".format(args[sub], args[ses]):path_generator(sub, ses) for sub in args['sub_list'] for ses in args['ses_list']}
     sub_ses_dict = {"{}_{}".format(sub.rstrip('\n'), ses.rstrip('\n')): path_generator(sub.rstrip('\n'), ses.rstrip('\n')) for sub in open(args['sub_list'], 'r') for ses in open(args['ses_list'], 'r')}
     #sub_ses_dict = {"{}_{}".format(sub.rstrip('\n'), ses.rstrip('\n')): [reho_path(sub, ses)] + [res_filt_path(sub, ses)] for sub in args['sub_list'] for ses in args['ses_list']}
 print(sub_ses_dict)
-
-input_node = Node(Function(output_names=['mean', 'res', 'reho'], function=path_generator), iterables=[('sub', sub_list), ('ses', ses_list)], name='input_node')
+'''
+#input_node = Node(Function(output_names=['mean', 'res', 'reho'], function=path_generator), iterables=[('sub', sub_list), ('ses', ses_list)], name='input_node')
 
 def print_inputs(mean, res, reho):
     print('hello', mean, res, reho)
@@ -125,12 +148,12 @@ data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_file
 data_grabber_node.inputs.template = '*'
 data_grabber_node.inputs.raise_on_empty = True
 data_grabber_node.inputs.drop_blank_outputs = True
-data_grabber_node.inputs.field_template = dict(mean="/projects/cgutierrez/rockland_sample_cpac/All_Outputs/%s_%s/mean_functional/_scan_rest_acq-1400/sub-%s_ses-%s_task-rest_acq-1400_bold_calc_resample_volreg_calc_tstat.nii.gz",
-                                               reho="/projects/cgutierrez/rockland_sample_cpac/All_Outputs/%s_%s/raw_reho_map/_scan_rest_acq-1400/_compcor_ncomponents_5_selector_pc10.linear1.wm0.global1.motion1.quadratic1.gm0.compcor1.csf0/_bandpass_freqs_0.01.10.0/ReHo.nii.gz",
-                                               res_filt="/projects/cgutierrez/rockland_sample_cpac/All_Outputs/%s_%s/alff_img/_scan_rest_acq-1400/_compcor_ncomponents_5_selector_pc10.linear1.wm0.global1.motion1.quadratic1.gm0.compcor1.csf0/_hp_0.01/_lp_0.1/residual_filtered_3dT.nii.gz")
-data_grabber_node.inputs.template_args = dict(mean=[['sub', 'ses', 'sub', 'ses']],
-                                              reho=[['sub', 'ses']],
-                                              res_filt=[['sub', 'ses']])
+data_grabber_node.inputs.field_template = temps#dict(mean="/projects/cgutierrez/rockland_sample_cpac/All_Outputs/%s_%s/mean_functional/_scan_rest_acq-1400/sub-%s_ses-%s_task-rest_acq-1400_bold_calc_resample_volreg_calc_tstat.nii.gz",
+                                          #     reho="/projects/cgutierrez/rockland_sample_cpac/All_Outputs/%s_%s/raw_reho_map/_scan_rest_acq-1400/_compcor_ncomponents_5_selector_pc10.linear1.wm0.global1.motion1.quadratic1.gm0.compcor1.csf0/_bandpass_freqs_0.01.10.0/ReHo.nii.gz",
+                                          #     res_filt="/projects/cgutierrez/rockland_sample_cpac/All_Outputs/%s_%s/alff_img/_scan_rest_acq-1400/_compcor_ncomponents_5_selector_pc10.linear1.wm0.global1.motion1.quadratic1.gm0.compcor1.csf0/_hp_0.01/_lp_0.1/residual_filtered_3dT.nii.gz")
+data_grabber_node.inputs.template_args = ars#dict(mean=[['sub', 'ses', 'sub', 'ses']],
+                                         #     reho=[['sub', 'ses']],
+                                         #     res_filt=[['sub', 'ses']])
 data_grabber_node.iterables = [('sub', sub_list), ('ses', ses_list)]
 
 
@@ -141,16 +164,20 @@ merge_transforms_node = Node(Merge(2), iterfield='in2', name='merge_transforms')
 
 #apply_transforms_node = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), iterables=, name='apply_transform')
 
-#merge_input_files_node = Node(Merge(2), iterfield='in2', name='merge_input_files')
-merge_input_files_node = Node(Merge(3), iterfield=['in2', 'in3'], name='merge_input_files')
+merge_input_files_node = Node(Merge(2), iterfield='in2', name='merge_input_files')
+#merge_input_files_node = Node(Merge(3), iterfield=['in2', 'in3'], name='merge_input_files')
+
 map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, interpolation='BSpline'), iterfield=['input_image'], name='map_apply_node')
 
 transform_images = Workflow(name='cpac_epi_reg',base_dir=args['results_dir'])# base_dir='/projects/abeetem/results/cpac_epi_reg')
 
 transform_images.connect([(data_grabber_node, generate_transforms_node, [('mean', 'input_image')])])
-#TODO: the input images are selected by the input node, but the
+#TODO: the input images are by the input node, but the
 
-transform_images.connect([(data_grabber_node, merge_input_files_node, [('reho', 'in1'), ('res_filt', 'in2'), ('mean', 'in3')])])
+#transform_images.connect([(data_grabber_node, merge_input_files_node, [('reho', 'in1'), ('res_filt', 'in2'), ('mean', 'in3')])])
+transform_images.connect([(data_grabber_node, merge_input_files_node, [('reho', 'in1'), ('res_filt', 'in2')])])
+
+
 # transform_images.connect([(merge_input_files_node, apply_transforms_node, [('out', 'input_image')])])
 transform_images.connect([(merge_input_files_node, map_apply_node, [('out', 'input_image')])])
 
@@ -161,22 +188,25 @@ transform_images.connect([(generate_transforms_node, merge_transforms_node, [('a
 #transform_images.connect(merge_transforms_node, 'out', apply_transforms_node, 'transforms')
 transform_images.connect(merge_transforms_node, 'out', map_apply_node, 'transforms')
 
-if False:
-    data_sink_node = Node(nio.DataSink( base_directory='data_sink'), name='data_sink')
+if True:
+    #for some reason, trying to add a datasink to save the result of the genwarpfield node causes the porgram to freeze,
+    # and it also causes seems to only create one data sink per run, not per subject as it should
+    data_sink_node = Node(nio.DataSink( base_directory='/projects/abeetem/results/cpac_epi_reg6/data_sink'), name='data_sink')
     #data_sink_node.inputs.base_directory = args['results_dir']
-    transform_images.connect(generate_transforms_node, 'output_file', data_sink_node, 'data_sink2')
+    transform_images.connect(generate_transforms_node, 'output_file', data_sink_node, 'output_file')
+    transform_images.connect(map_apply_node, 'output_image', data_sink_node, 'output_image')
     #generate_transforms_node.save()
-    try:
-        generate_transforms_node.get_output('output_file')
-    except:
-        print('didnt work')
+    # try:
+    #     generate_transforms_node.get_output('output_file')
+    # except:
+    #     print('didnt work')
 
 if True:
     transform_images.write_graph(graph2use='orig', dotfilename='./cpac_epi_reg_orig', format='svg')
     transform_images.write_graph(graph2use='colored', dotfilename='./cpac_epi_reg_colored', format='svg')
     transform_images.write_graph(graph2use='exec', dotfilename='./cpac_epi_reg_exec', format='svg')
 
-transform_images.run('MultiProc', plugin_args={'n_procs':20})
+transform_images.run('MultiProc', plugin_args={'n_procs':6})
 
 """
 Input mean image: 

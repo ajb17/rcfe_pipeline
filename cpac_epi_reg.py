@@ -14,6 +14,7 @@ import numpy as np
 import nipype.interfaces.io as nio
 
 from nipype import DataGrabber
+from itertools import chain
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-s', '--starter', required=False, help='The image that is applied to the template to create transforms')
@@ -21,12 +22,16 @@ ap.add_argument('-t', '--template', required=True, help='The template that the s
 group = ap.add_mutually_exclusive_group(required=False)
 group.add_argument('-i', '--images', nargs='+', help='The images paths you want to have the transformations appplied to')
 group.add_argument('-ips', '--image_path_source', help='An iterables source of image files paths to have transformations applied to')
-ap.add_argument('-sub_list', '--sub_list', required=False, help='The list of subjects to iterate through')
-ap.add_argument('-ses_list', '--ses_list', required=False, help='The list of sessions to itereate through')
+#ap.add_argument('-sub_list', '--sub_list', required=False, help='The list of subjects to iterate through')
+#ap.add_argument('-ses_list', '--ses_list', required=False, help='The list of sessions to itereate through')
 ap.add_argument('-d', '--directory', required=False, help='The directory to searchh for subject, session pairs')
 ap.add_argument('-r', '--results_dir', required=True, help='where to store the results')
 ap.add_argument('-der', '--derivatives', required=True, help='The text file containg the derivate path templates')
-args = vars(ap.parse_args())
+ap.add_argument('-iter', '--iterables', nargs='*', required=False, help='The keywords ftom the templates to iterate through')
+parsed_args, unknown = ap.parse_known_args()
+args = vars(parsed_args)
+#args = vars(ap.parse_args())
+#print(ap.parse_args())
 
 
 # TODO: What is the input type for images?
@@ -49,7 +54,7 @@ for i in open(args['derivatives'], 'r'):
         continue
     key, temp, targs = parse_template_entry(i)
     temps[key] = temp.rstrip("\n")
-    ars[unicode(key)] = [[arg.rstrip('\n').lstrip(' ') for arg in targs if arg is not '']]
+    ars[unicode(key)] = [[arg.rstrip('\n').lstrip(' ') for arg in targs if arg is not '']]#TODO: I wrapped this in a list for a reason, probably to match something in nipype, but should see if i can remove it, it complicates a few things down the road
     #TODO: this would probably be a little more efficient to do it as we create the list if possible
 
 
@@ -57,28 +62,33 @@ for i in open(args['derivatives'], 'r'):
 template = abspath(args['template'])
 
 
-if args['sub_list'] is not None:
-    if args['ses_list'] is None:
-        raise Exception('Must specify ses_list if sub_list is specified')
-    sub_list = args['sub_list']
-    ses_list = args['ses_list']
-sub_list = [sub.rstrip('\n') for sub in open(args['sub_list'], 'r')]
-ses_list = [ses.rstrip('\n') for ses in open(args['ses_list'], 'r')]
+# if args['sub_list'] is not None:
+#     if args['ses_list'] is None:
+#         raise Exception('Must specify ses_list if sub_list is specified')
 
-#input_node = Node(Function(output_names=['mean', 'res', 'reho'], function=path_generator), iterables=[('sub', sub_list), ('ses', ses_list)], name='input_node')
+    #arguments = list(set(chain(*chain(*ars.values()))))
 
-def print_inputs(mean, res, reho):
-    print('hello', mean, res, reho)
-print_node = Node(Function(function=print_inputs), name='print_inputs')
+    # This args['iterables'] is how we store the keywords for the templates with their associated lists to iterate through
+    # the list has a format of [key1, list1.txt, key2, list2.txt, ...]
+temp_args = args['iterables']
+    # This formats the above list into a dictionary where we can much more easily associate keywords to their lists
+template_arguments = {temp_args[::2][i]: temp_args[1::2][i] for i in range(len(temp_args) / 2)} #TODO: is this dictionary comprehension too much?
 
-
-data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, infields=['sub', 'ses'], outfields=['mean', 'reho', 'res_filt']), name='data_grabber')
+    # sub_list = args['sub_list']
+    # ses_list = args['ses_list']
+# sub_list = [sub.rstrip('\n') for sub in open(args['sub_list'], 'r')]
+# ses_list = [ses.rstrip('\n') for ses in open(args['ses_list'], 'r')]
+data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, infields=template_arguments.keys(), outfields=[tmp for tmp in temps]), name='data_grabber')
 data_grabber_node.inputs.template = '*'
 data_grabber_node.inputs.raise_on_empty = True
 data_grabber_node.inputs.drop_blank_outputs = True
 data_grabber_node.inputs.field_template = temps
 data_grabber_node.inputs.template_args = ars
-data_grabber_node.iterables = [('sub', sub_list), ('ses', ses_list)]
+data_grabber_node.iterables = [ (  key,
+                                   [thing.rstrip('\n') for thing in open(template_arguments[key], 'r')]
+                                )
+                                for key in template_arguments.keys()] #TODO: Is nested list comprehenion too much?
+                                #[('sub', sub_list), ('ses', ses_list)]
 
 
 generate_transforms_node = Node(legacy.GenWarpFields(reference_image=template), name='generate_transforms')
@@ -93,12 +103,11 @@ merge_input_files_node = Node(Merge(2), iterfield='in2', name='merge_input_files
 
 map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, interpolation='BSpline'), iterfield=['input_image'], name='map_apply_node')
 
-transform_images = Workflow(name='cpac_epi_reg',base_dir=args['results_dir'])# base_dir='/projects/abeetem/results/cpac_epi_reg')
+transform_images = Workflow(name='cpac_epi_reg', base_dir=args['results_dir'])# base_dir='/projects/abeetem/results/cpac_epi_reg')
 
 transform_images.connect([(data_grabber_node, generate_transforms_node, [('mean', 'input_image')])])
 #TODO: the input images are by the input node, but the
 
-#transform_images.connect([(data_grabber_node, merge_input_files_node, [('reho', 'in1'), ('res_filt', 'in2'), ('mean', 'in3')])])
 transform_images.connect([(data_grabber_node, merge_input_files_node, [('reho', 'in1'), ('res_filt', 'in2')])])
 
 
@@ -113,7 +122,8 @@ transform_images.connect([(generate_transforms_node, merge_transforms_node, [('a
 transform_images.connect(merge_transforms_node, 'out', map_apply_node, 'transforms')
 
 if True:
-    data_sink_node = Node(nio.DataSink( base_directory='/projects/abeetem/results/cpac_epi_reg6/data_sink'), name='data_sink')
+
+    data_sink_node = Node(nio.DataSink(base_directory=args['results_dir'] + 'output'), name='data_sink')
     transform_images.connect(generate_transforms_node, 'output_file', data_sink_node, 'output_file')
     transform_images.connect(map_apply_node, 'output_image', data_sink_node, 'output_image')
 

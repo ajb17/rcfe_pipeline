@@ -13,7 +13,7 @@ from nipype.interfaces.fsl import MCFLIRT, maths, BET, FLIRT
 from nipype.interfaces.fsl.maths import MeanImage, IsotropicSmooth
 from nipype.interfaces.utility import Merge
 from nipype.interfaces.afni import SkullStrip
-from nipype.interfaces.ants import WarpImageMultiTransform, Registration, legacy, ApplyTransforms
+from nipype.interfaces.ants import WarpImageMultiTransform, Registration, legacy, ApplyTransforms, N4BiasFieldCorrection
 import argparse
 import nibabel as nib
 from scipy import stats
@@ -23,6 +23,7 @@ import numpy as np
 import nipype.interfaces.io as nio
 from nipype.interfaces.io import BIDSDataGrabber
 from bids import BIDSLayout
+
 
 
 
@@ -169,6 +170,9 @@ mean_fmri = Node(MeanImage(output_type='NIFTI'), name="meanimage")
 # Skull Strip the fmri time series
 bet_fmri = Node(BET(output_type='NIFTI', mask=True), name="bet_fmri")
 
+# Bias Correct the fmri time series
+bias_correction = Node(N4BiasFieldCorrection(), name='bias_correction')
+
 def compute_scFe(input_image, mask_image, invert_sign=True):
     import nibabel as nib
     import numpy as np
@@ -268,7 +272,7 @@ base_dir_string = "/projects/abeetem/results/pipelineplus"
 if args['t1_temp'] is not None:
     base_dir_string = base_dir_string + '/t1_reg'
 else:
-    base_dir_string = base_dir_string + '/epi_reg'
+    base_dir_string = base_dir_string + '/epi_reg1'
 
 base_dir = os.path.abspath(base_dir_string)
 full_process = Workflow(name='full_process', base_dir=base_dir)
@@ -284,8 +288,10 @@ if args['t1_temp'] is not None:
 
 else:
     full_process.connect(accept_input, 'file_unwrapper.time_series', make_rcfe, 'mcflirt.in_file')
-
-    full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
+    full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction, 'mask_image')
+    full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction, 'input_image')
+    # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
+    full_process.connect(bias_correction, 'output_image', get_transforms, 'fmri_to_temp.input_image')
     full_process.connect(make_rcfe, 'rcfe.output_image', get_transforms, 'apply_epi_transforms.input_image')
     full_process.connect(get_transforms, 'apply_epi_transforms.output_image', isoSmooth, 'in_file')
 

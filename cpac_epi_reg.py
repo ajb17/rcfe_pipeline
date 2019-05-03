@@ -83,10 +83,13 @@ map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, int
 transform_images = Workflow(name='cpac_epi_reg', base_dir=args['results_dir'])# base_dir='/projects/abeetem/results/cpac_epi_reg')
 
 #TODO: do reho, res, bias mask are all hardcoded here, but they shouldnt be
-transform_images.connect([(data_grabber_node, bias_correction_node, [('bias_mask', 'mask_image')])])
-transform_images.connect([(data_grabber_node, bias_correction_node, [('mean', 'input_image')])])
-transform_images.connect([(bias_correction_node, generate_transforms_node, [('output_image', 'input_image')])])
-# transform_images.connect([(data_grabber_node, generate_transforms_node, [('mean', 'input_image')])])
+if 'bias_mask' in temps:
+    transform_images.connect([(data_grabber_node, bias_correction_node, [('bias_mask', 'mask_image')])])
+    transform_images.connect([(data_grabber_node, bias_correction_node, [('mean', 'input_image')])])
+    transform_images.connect([(bias_correction_node, generate_transforms_node, [('output_image', 'input_image')])])
+else:
+    #TODO: Should I print an indication that no bias mask was used? It didnt have much of an impact on the final results from what i could tell at least
+    transform_images.connect([(data_grabber_node, generate_transforms_node, [('mean', 'input_image')])])
 #TODO: the input images are by the input node, but the
 
 transform_images.connect([(data_grabber_node, merge_input_files_node, [(derivatives_names[i], 'in' +str(i+1)) for i in range(len(derivatives_names))])])

@@ -42,6 +42,7 @@ ap.add_argument('-all', '--show_all', required=False, help='Write out all interm
 ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze')
 ap.add_argument('-r', '--results_dir', required=False, help='The directory that you want to write results to')
 ap.add_argument('-p', '--processes', required=False, type=int, default=5, help='The amount of processes you want to dedicate to the process')
+ap.add_argument('-g', 'draw_graphs', required=False, default=False, type=bool, help='Wether you want to have the graphs drawn out or not')
 args = vars(ap.parse_args())
 
 
@@ -140,7 +141,7 @@ processing:
 1) motion correction (mcflrt);
     compute mean (fslmaths);
     skull strip (BET);
-    scaling within mask: zscale (python code or fslstats + fslmaths),multiply by -1 = rcFe;                              # AvScale???  Slicer???
+    scaling within mask: zscale (python code or fslstats + fslmaths),multiply by -1 = rcFe;                              
     coregister mean fMRI to skullstripped T1 (FLIRT)    60oF     -> image, mat file
 
 2) skull strip (afni 3dSkullStrip);
@@ -150,7 +151,6 @@ processing:
     apply spatial smoothing (4mm iso gaussian; fslmaths).
 """
 
-# 1_______________________
 # Motion correction on fmri time series
 mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")
 
@@ -198,7 +198,6 @@ rcfe_node = Node(Function(input_names=['input_image', 'mask_image'], output_name
 # coregister (skullstripped) mean of the fmri time series to the skull stripped T1 structural
 flirt_node = Node(FLIRT(dof=6), name="flirt", cost='mutualinfo')  # do i have to specify out_matrix_file???
 
-# 2_____________________
 # skullstrip the T1 structural image
 skullstrip_structural_node = Node(SkullStrip(outputtype='NIFTI'), name='skullstrip')
 
@@ -206,7 +205,6 @@ skullstrip_structural_node = Node(SkullStrip(outputtype='NIFTI'), name='skullstr
 warp_to_152_node = Node(legacy.GenWarpFields(reference_image=template, similarity_metric="CC"), name="warp152")
 
 
-# 3______________________
 # coreg_to_struct_space = Node(FLIRT(apply_xfm=True, reference=struct_image, interp="sinc"), name="coreg")
 coreg_to_struct_space_node = Node(FLIRT(apply_xfm=True, interp="sinc", cost='mutualinfo'), name="coreg_to_struct_space")
 
@@ -218,8 +216,6 @@ iso_smooth_node = Node(IsotropicSmooth(fwhm=4, output_type="NIFTI"), name='isoSm
 
 data_sink_node = Node(nio.DataSink(base_directory="results_dir", container='warp152_output', infields=['tt']),
                       name='dataSink')
-
-
 
 
 accept_input = Workflow(name='take_input')
@@ -289,9 +285,9 @@ else:
 
 
 full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
-if False:
+if args['draw_graphs']:
     if args['t1_temp'] is not None:
-        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_T1', format='svg')
+        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_T1', format='svg')
     else:
-        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_epi', format='svg')
+        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_epi', format='svg')
 

@@ -22,7 +22,7 @@ ap.add_argument('-d', '--directory', required=False, help='The directory to sear
 ap.add_argument('-r', '--results_dir', required=True, help='where to store the results')
 ap.add_argument('-der', '--derivatives', required=True, help='The text file containg the derivate path templates')
 ap.add_argument('-iter', '--iterables', nargs='*', required=False, help='Associate the variables from your templates with a data source containing each variables values. Should be in the format: Key1 Source1 Key2 Source2 ...')
-ap.add_arguments('-p', '--processes', required=False, default=5, type=int, help='How many processes you want to dedicate to this task. Default 5')
+ap.add_argument('-p', '--processes', required=False, default=5, type=int, help='How many processes you want to dedicate to this task. Default 5')
 parsed_args, unknown = ap.parse_known_args()
 args = vars(parsed_args)
 

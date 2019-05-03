@@ -1,13 +1,7 @@
-# import sklearn
-# import nilearn
-
 import nipype
 import os
 from os.path import abspath
 from nipype import Workflow, Node, MapNode, Function
-# from nilearn.plotting import plot_anat
-
-# import matplotlib.pyplot as plt
 
 from nipype.interfaces.fsl import MCFLIRT, maths, BET, FLIRT
 from nipype.interfaces.fsl.maths import MeanImage, IsotropicSmooth
@@ -16,15 +10,11 @@ from nipype.interfaces.afni import SkullStrip
 from nipype.interfaces.ants import WarpImageMultiTransform, Registration, legacy, ApplyTransforms, N4BiasFieldCorrection
 import argparse
 import nibabel as nib
-from scipy import stats
 
 import numpy as np
-# from nipype.scripts.crash_files import display_crash_file
 import nipype.interfaces.io as nio
 from nipype.interfaces.io import BIDSDataGrabber
 from bids import BIDSLayout
-
-
 
 
 ap = argparse.ArgumentParser()
@@ -50,7 +40,8 @@ ap.add_argument('-task', '--task', required=False, help='The task to look for in
 ap.add_argument('-all', '--show_all', required=False, help='Write out all intermediate files')
 
 ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze')
-ap.add_arguments('-r', '--results_dir', required=False, help='The directory that you want to write results to')
+ap.add_argument('-r', '--results_dir', required=False, help='The directory that you want to write results to')
+ap.add_argument('-p', '--processes', required=False, type=int, default=5, help='The amount of processes you want to dedicate to the process')
 args = vars(ap.parse_args())
 
 
@@ -95,14 +86,14 @@ layout = BIDSLayout(args['directory'])
 
 
 
-file_grabber = Node(BIDSDataGrabber(), name="file_grabber")
-file_grabber.inputs.base_dir = args['directory']
-file_grabber.inputs.output_query = query
+file_grabber_node = Node(BIDSDataGrabber(), name="file_grabber")
+file_grabber_node.inputs.base_dir = args['directory']
+file_grabber_node.inputs.output_query = query
 
 
 if args['subject'] is not None:
    # file_grabber.iterables = ('subject', layout.get_subjects())#file_grabber.inputs.subject = 'M10999905'#args['subject']
-    file_grabber.iterables = ('subject', [args['subject']])
+    file_grabber_node.iterables = ('subject', [args['subject']])
     #file_grabber.inputs.subject = args['subject']
 elif args['subjects'] is not None:
     def get_sub_from_path(path):
@@ -114,21 +105,21 @@ elif args['subjects'] is not None:
     sub_list = []
     for line in open(abspath(args['subjects']), 'r'):
         sub_list.append(get_sub_from_path(line))
-    file_grabber.iterables = ('subject', sub_list)
+    file_grabber_node.iterables = ('subject', sub_list)
 else:
-    file_grabber.iterables = ('subject', layout.get_subjects())
+    file_grabber_node.iterables = ('subject', layout.get_subjects())
 
 #if not args.has_key('session') and not:
 
 #TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
 # also, there are result files created for these failed iterations rn, but theres no point to the
-file_grabber.inputs.raise_on_empty = True
+file_grabber_node.inputs.raise_on_empty = True
 
 # The BIDSDataGrabber outputs the files inside of a list, but all other nodes only accepts file paths, not lsits
 def unlist(time_series, struct):
     print(struct)
     return time_series[0], struct[0]
-file_unwrapper = Node(Function(function=unlist, output_names=['time_series', 'struct']), name='file_unwrapper')
+file_unwrapper_node = Node(Function(function=unlist, output_names=['time_series', 'struct']), name='file_unwrapper')
 
 
 
@@ -161,17 +152,17 @@ processing:
 
 # 1_______________________
 # Motion correction on fmri time series
-mcflirt = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")
+mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")
 
 
 # Compute mean(fslmaths) of the fmri time series
-mean_fmri = Node(MeanImage(output_type='NIFTI'), name="meanimage")
+mean_fmri_node = Node(MeanImage(output_type='NIFTI'), name="meanimage")
 
 # Skull Strip the fmri time series
-bet_fmri = Node(BET(output_type='NIFTI', mask=True), name="bet_fmri")
+bet_fmri_node = Node(BET(output_type='NIFTI', mask=True), name="bet_fmri")
 
 # Bias Correct the fmri time series
-bias_correction = Node(N4BiasFieldCorrection(), name='bias_correction')
+bias_correction_node = Node(N4BiasFieldCorrection(), name='bias_correction')
 
 def compute_scFe(input_image, mask_image, invert_sign=True):
     import nibabel as nib
@@ -201,58 +192,58 @@ def compute_scFe(input_image, mask_image, invert_sign=True):
 
 
 # Returns the relative concentration of brain iron
-rcfe = Node(Function(input_names=['input_image', 'mask_image'], output_names=['output_image'], function=compute_scFe),
-            name="rcfe")
+rcfe_node = Node(Function(input_names=['input_image', 'mask_image'], output_names=['output_image'], function=compute_scFe),
+                 name="rcfe")
 
 # coregister (skullstripped) mean of the fmri time series to the skull stripped T1 structural
-flirt = Node(FLIRT(dof=6), name="flirt", cost='mutualinfo')  # do i have to specify out_matrix_file???
+flirt_node = Node(FLIRT(dof=6), name="flirt", cost='mutualinfo')  # do i have to specify out_matrix_file???
 
 # 2_____________________
 # skullstrip the T1 structural image
-skullstrip_structural = Node(SkullStrip(outputtype='NIFTI'), name='skullstrip')
+skullstrip_structural_node = Node(SkullStrip(outputtype='NIFTI'), name='skullstrip')
 
 # Warp whole head T1 Structural Image to MNI 152 template
-warp_to_152 = Node(legacy.GenWarpFields(reference_image=template, similarity_metric="CC"), name="warp152")
+warp_to_152_node = Node(legacy.GenWarpFields(reference_image=template, similarity_metric="CC"), name="warp152")
 
 
 # 3______________________
 # coreg_to_struct_space = Node(FLIRT(apply_xfm=True, reference=struct_image, interp="sinc"), name="coreg")
-coreg_to_struct_space = Node(FLIRT(apply_xfm=True, interp="sinc", cost='mutualinfo'), name="coreg_to_struct_space")
+coreg_to_struct_space_node = Node(FLIRT(apply_xfm=True, interp="sinc", cost='mutualinfo'), name="coreg_to_struct_space")
 
-coreg_to_template_space = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), name="coreg_to_template_space")
+coreg_to_template_space_node = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), name="coreg_to_template_space")
 merge_transforms_node = Node(Merge(2), iterfield=['in2'], name="merge")
 
 # Spatial smoothing
-isoSmooth = Node(IsotropicSmooth(fwhm=4, output_type="NIFTI"), name='isoSmooth')
+iso_smooth_node = Node(IsotropicSmooth(fwhm=4, output_type="NIFTI"), name='isoSmooth')
 
-dataSink = Node(nio.DataSink(base_directory="results_dir", container='warp152_output', infields=['tt']),
-                name='dataSink')
+data_sink_node = Node(nio.DataSink(base_directory="results_dir", container='warp152_output', infields=['tt']),
+                      name='dataSink')
 
 
 
 
 accept_input = Workflow(name='take_input')
-accept_input.connect([(file_grabber, file_unwrapper, [('time_series', 'time_series'), ('struct', 'struct')])])
+accept_input.connect([(file_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 
 make_rcfe = Workflow(name='make_rcfe')
-make_rcfe.connect(mcflirt, 'out_file', mean_fmri, 'in_file')
-make_rcfe.connect(mean_fmri, 'out_file', bet_fmri, 'in_file')
-make_rcfe.connect(mean_fmri, 'out_file', rcfe, 'input_image')
-make_rcfe.connect(bet_fmri, 'mask_file', rcfe, 'mask_image')
+make_rcfe.connect(mcflirt_node, 'out_file', mean_fmri_node, 'in_file')
+make_rcfe.connect(mean_fmri_node, 'out_file', bet_fmri_node, 'in_file')
+make_rcfe.connect(mean_fmri_node, 'out_file', rcfe_node, 'input_image')
+make_rcfe.connect(bet_fmri_node, 'mask_file', rcfe_node, 'mask_image')
 
 
 
 get_transforms = Workflow(name="get_transforms")
 if args['t1_temp']:
-    get_transforms.connect(skullstrip_structural, 'out_file', flirt, 'reference')
+    get_transforms.connect(skullstrip_structural_node, 'out_file', flirt_node, 'reference')
     ### get_transforms.connect(make_rcfe, 'bet_fmri.out_file', flirt, 'in_file')
 
-    get_transforms.connect(flirt, 'out_matrix_file', coreg_to_struct_space, 'in_matrix_file')
+    get_transforms.connect(flirt_node, 'out_matrix_file', coreg_to_struct_space_node, 'in_matrix_file')
     ### get_transforms.connect(make_rcfe, 'rcfe.output_image', coreg_to_struct_space, 'in_file')
-    get_transforms.connect(coreg_to_struct_space, 'out_file', coreg_to_template_space, 'input_image')
+    get_transforms.connect(coreg_to_struct_space_node, 'out_file', coreg_to_template_space_node, 'input_image')
     #get_transforms.connect(accept_input, 'file_unwrapper.struct', warp_to_152, 'input_image')
-    get_transforms.connect([(warp_to_152, merge_transforms_node, [('affine_transformation', 'in2'), ('warp_field', 'in1')])])
-    get_transforms.connect(merge_transforms_node, 'out', coreg_to_template_space, 'transforms')
+    get_transforms.connect([(warp_to_152_node, merge_transforms_node, [('affine_transformation', 'in2'), ('warp_field', 'in1')])])
+    get_transforms.connect(merge_transforms_node, 'out', coreg_to_template_space_node, 'transforms')
 
 else:
     # Second processsing Option
@@ -264,7 +255,7 @@ else:
     get_transforms.connect([(reg_fmri_temp, merge_epi_transforms, [('affine_transformation', 'in2'),  ('warp_field', 'in1')])])
     get_transforms.connect(merge_epi_transforms, 'out', apply_epi_temp, 'transforms')
 
-#
+
 # apply_transforms = Workflow(name='apply_transforms')
 # if args['t1_temp'] is not None:
 
@@ -284,27 +275,20 @@ if args['t1_temp'] is not None:
                       (accept_input, get_transforms, [('file_unwrapper.struct', 'skullstrip.in_file')]),
                       (accept_input, get_transforms, [('file_unwrapper.struct', 'coreg_to_struct_space.reference')]),
                      ])
-    full_process.connect(get_transforms, 'coreg_to_template_space.output_image', isoSmooth, 'in_file')
+    full_process.connect(get_transforms, 'coreg_to_template_space.output_image', iso_smooth_node, 'in_file')
 
 else:
     full_process.connect(accept_input, 'file_unwrapper.time_series', make_rcfe, 'mcflirt.in_file')
-    full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction, 'mask_image')
-    full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction, 'input_image')
+    full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction_node, 'mask_image')
+    full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction_node, 'input_image')
     # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
-    full_process.connect(bias_correction, 'output_image', get_transforms, 'fmri_to_temp.input_image')
+    full_process.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
     full_process.connect(make_rcfe, 'rcfe.output_image', get_transforms, 'apply_epi_transforms.input_image')
-    full_process.connect(get_transforms, 'apply_epi_transforms.output_image', isoSmooth, 'in_file')
+    full_process.connect(get_transforms, 'apply_epi_transforms.output_image', iso_smooth_node, 'in_file')
 
 
 
-# smooth_rcfe = Workflow(name='smooth rcfe')
-# smooth_rcfe.connect()
-
-#if args['show_all'] is not None:
-
-
-
-full_process.run('MultiProc', plugin_args={'n_procs':20})
+full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
 if False:
     if args['t1_temp'] is not None:
         full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_colored_T1', format='svg')

@@ -49,7 +49,8 @@ for i in open(args['derivatives'], 'r'):
 
 derivatives_names = temps.keys()
 derivatives_names.remove('mean')
-derivatives_names.remove('bias_mask')
+if 'bias_mask' in derivatives_names:
+    derivatives_names.remove('bias_mask')
 
 template = abspath(args['template'])
 

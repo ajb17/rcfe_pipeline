@@ -50,7 +50,7 @@ ap.add_argument('-task', '--task', required=False, help='The task to look for in
 ap.add_argument('-all', '--show_all', required=False, help='Write out all intermediate files')
 
 ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze')
-
+ap.add_arguments('-r', '--results_dir', required=False, help='The directory that you want to write results to')
 args = vars(ap.parse_args())
 
 
@@ -268,11 +268,11 @@ else:
 # apply_transforms = Workflow(name='apply_transforms')
 # if args['t1_temp'] is not None:
 
-base_dir_string = "/projects/abeetem/results/pipelineplus"
+base_dir_string = args['results_dir']#"/projects/abeetem/results/pipelineplus"
 if args['t1_temp'] is not None:
     base_dir_string = base_dir_string + '/t1_reg'
 else:
-    base_dir_string = base_dir_string + '/epi_reg1'
+    base_dir_string = base_dir_string + '/epi_reg'
 
 base_dir = os.path.abspath(base_dir_string)
 full_process = Workflow(name='full_process', base_dir=base_dir)

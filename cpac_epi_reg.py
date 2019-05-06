@@ -13,15 +13,16 @@ import nipype.interfaces.io as nio
 from nipype import DataGrabber
 
 ap = argparse.ArgumentParser()
-ap.add_argument('-s', '--starter', required=False, help='The image that is applied to the template to create transforms')
-ap.add_argument('-t', '--template', required=True, help='The template that the starter image is applied to to create transforms')
-group = ap.add_mutually_exclusive_group(required=False)
-group.add_argument('-i', '--images', nargs='+', help='The images paths you want to have the transformations appplied to')
-group.add_argument('-ips', '--image_path_source', help='An iterables source of image files paths to have transformations applied to')
+ap.add_argument('-m', '--mean', required=False, help='The mean image you want to generate trasnforms from')
+# ap.add_argument('-im', '--images', required=False, help='The derivative images you want the transfroms applied to')
+ap.add_argument('-t', '--template', required=True, help='The template that the mean image is applied to to create transforms')
+group = ap.add_mutually_exclusive_group(required=True)
+group.add_argument('-i', '--images', nargs='+', help='The derivative images you want the transfroms applied to')
+group.add_argument('-dt', '--derivatives', help='The text file containg the derivate path templates')
 ap.add_argument('-d', '--directory', required=False, help='The directory to searchh for subject, session pairs')
 ap.add_argument('-r', '--results_dir', required=True, help='where to store the results')
-ap.add_argument('-der', '--derivatives', required=True, help='The text file containg the derivate path templates')
-ap.add_argument('-iter', '--iterables', nargs='*', required=False, help='Associate the variables from your templates with a data source containing each variables values. Should be in the format: Key1 Source1 Key2 Source2 ...')
+# ap.add_argument('-dt', '--derivatives', required=True, help='The text file containg the derivate path templates')
+ap.add_argument('-ta', '--template_arguments', nargs='*', required=False, help='Associate the variables from your templates with a data source containing each variables values. Should be in the format: Key1 Source1 Key2 Source2 ...')
 ap.add_argument('-p', '--processes', required=False, default=5, type=int, help='How many processes you want to dedicate to this task. Default 5')
 parsed_args, unknown = ap.parse_known_args()
 args = vars(parsed_args)
@@ -37,17 +38,19 @@ def parse_template_entry(entry):
     return key, template, args
 
 # This is where we build up the dictionaries of templates and arguments for the nipype data grabber
-temps = {}
-ars = {}
+temps_dict = {}
+temp_args_dict = {}
 for i in open(args['derivatives'], 'r'):
     if i is '' or i == '\n':
         continue
     key, temp, targs = parse_template_entry(i)
-    temps[key] = temp.rstrip("\n")
-    ars[unicode(key)] = [[arg.rstrip('\n').lstrip(' ') for arg in targs if arg is not '']]#TODO: I wrapped this in a list for a reason, probably to match something in nipype, but should see if i can remove it, it complicates a few things down the road
+    temps_dict[key] = temp.rstrip("\n")
+    temp_args_dict[unicode(key)] = [[arg.rstrip('\n').lstrip(' ') for arg in targs if arg is not '']]#TODO: I wrapped this in a list for a reason, probably to match something in nipype, but should see if i can remove it, it complicates a few things down the road
     #TODO: this would probably be a little more efficient to do it as we create the list if possible
 
-derivatives_names = temps.keys()
+
+
+derivatives_names = temps_dict.keys()
 derivatives_names.remove('mean')
 if 'bias_mask' in derivatives_names:
     derivatives_names.remove('bias_mask')
@@ -55,17 +58,17 @@ if 'bias_mask' in derivatives_names:
 template = abspath(args['template'])
 
 
-temp_args = args['iterables']
+temp_args = args['template_arguments']
 # This formats the above list into a dictionary where we can much more easily associate keywords to their lists
 template_arguments = {temp_args[::2][i]: temp_args[1::2][i] for i in range(len(temp_args) / 2)} #TODO: is this dictionary comprehension too much?
 
 
-data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, infields=template_arguments.keys(), outfields=[tmp for tmp in temps]), name='data_grabber')
+data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, infields=template_arguments.keys(), outfields=[tmp for tmp in temps_dict]), name='data_grabber')
 data_grabber_node.inputs.template = '*'
 data_grabber_node.inputs.raise_on_empty = True
 data_grabber_node.inputs.drop_blank_outputs = True
-data_grabber_node.inputs.field_template = temps
-data_grabber_node.inputs.template_args = ars
+data_grabber_node.inputs.field_template = temps_dict
+data_grabber_node.inputs.template_args = temp_args_dict
 data_grabber_node.iterables = [ (  key,
                                    [thing.rstrip('\n') for thing in open(template_arguments[key], 'r')]
                                 )
@@ -84,7 +87,7 @@ map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, int
 transform_images = Workflow(name='cpac_epi_reg', base_dir=args['results_dir'])# base_dir='/projects/abeetem/results/cpac_epi_reg')
 
 #TODO: do reho, res, bias mask are all hardcoded here, but they shouldnt be
-if 'bias_mask' in temps:
+if 'bias_mask' in temps_dict:
     transform_images.connect([(data_grabber_node, bias_correction_node, [('bias_mask', 'mask_image')])])
     transform_images.connect([(data_grabber_node, bias_correction_node, [('mean', 'input_image')])])
     transform_images.connect([(bias_correction_node, generate_transforms_node, [('output_image', 'input_image')])])
@@ -110,8 +113,7 @@ if True:
     transform_images.write_graph(graph2use='colored', dotfilename='./cpac_epi_reg_colored', format='svg')
     transform_images.write_graph(graph2use='exec', dotfilename='./cpac_epi_reg_exec', format='svg')
 
-# transform_images.run('MultiProc', plugin_args={'n_procs':6})
 transform_images.run('MultiProc', plugin_args={'n_procs':args['processes']})
-#TODO: The mean image and the bias mask are hard coded values, that must be specified in a text file and they must be name 'mean' and 'bias_mask" exaclty.
-# I need to adjust the rigidity of this, ideally wihtout writing every possible 'bias_mask' 'BiasMask' combination, and wihtout having to create even more text files
-# to hold each no derivative template.
+# TODO: The mean image and the bias mask are hard coded values, that must be specified in a text file and they must be name 'mean' and 'bias_mask" exaclty.
+#I need to adjust the rigidity of this, ideally wihtout writing every possible 'bias_mask' 'BiasMask' combination, and wihtout having to create even more text files
+#to hold each no derivative template.

@@ -26,7 +26,7 @@ group.add_argument('-epi_temp', '--epi_temp', help='The path the a premade templ
 
 #ap.add_argument('-temp', '--temp', required=True, help='The path to the template you are fitting your images to')
 ap.add_argument('-d', '--directory', required=True, help='The directory that your subjects are all found in')
-#TODO: i dont think we need any of these t1 parameters when we ust do the ipi to template registration, so we have make these a mutually exclusive group somehwo
+#TODO: i dont think we need any of these t1 parameters when we ust do the epi to template registration, so we have make these a mutually exclusive group somehwo
 ap.add_argument('-t-ses', '--t1-session', required=False, help='The specific session you are looking for for t1 images')
 ap.add_argument('-t-acq', '--t1-acquisition', required=False, help='The acquisition to look for in T1 images')
 ap.add_argument('-t-task', '--t1-task', required=False, help='The task to look for in T1 images')
@@ -42,7 +42,8 @@ ap.add_argument('-all', '--show_all', required=False, help='Write out all interm
 ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze')
 ap.add_argument('-r', '--results_dir', required=False, help='The directory that you want to write results to')
 ap.add_argument('-p', '--processes', required=False, type=int, default=5, help='The amount of processes you want to dedicate to the process')
-ap.add_argument('-g', 'draw_graphs', required=False, default=False, type=bool, help='Wether you want to have the graphs drawn out or not')
+ap.add_argument('-g', '--draw_graphs', required=False, default=False, type=bool, help='Wether you want to have the graphs drawn out or not')
+ap.add_argument('-b', '--bias_correction', required=False, type=bool, default=True, help="Wether you want the N4 bias correction step or not ...")
 args = vars(ap.parse_args())
 
 
@@ -105,7 +106,7 @@ elif args['subjects'] is not None:
     #TODO: what if the subjects are given alone iwhtout a path
     sub_list = []
     for line in open(abspath(args['subjects']), 'r'):
-        sub_list.append(get_sub_from_path(line))
+        sub_list.append(get_sub_from_path(line).rstrip())
     file_grabber_node.iterables = ('subject', sub_list)
 else:
     file_grabber_node.iterables = ('subject', layout.get_subjects())
@@ -114,7 +115,7 @@ else:
 
 #TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
 # also, there are result files created for these failed iterations rn, but theres no point to the
-file_grabber_node.inputs.raise_on_empty = True
+file_grabber_node.inputs.raise_on_empty = False#True
 
 # The BIDSDataGrabber outputs the files inside of a list, but all other nodes only accepts file paths, not lsits
 def unlist(time_series, struct):
@@ -275,10 +276,14 @@ if args['t1_temp'] is not None:
 
 else:
     full_process.connect(accept_input, 'file_unwrapper.time_series', make_rcfe, 'mcflirt.in_file')
-    full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction_node, 'mask_image')
-    full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction_node, 'input_image')
-    # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
-    full_process.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
+    #TODO: make this bias correctin optional
+    if args['bias_correction']:
+        full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction_node, 'mask_image')
+        full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction_node, 'input_image')
+        # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
+        full_process.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
+    else:
+        full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
     full_process.connect(make_rcfe, 'rcfe.output_image', get_transforms, 'apply_epi_transforms.input_image')
     full_process.connect(get_transforms, 'apply_epi_transforms.output_image', iso_smooth_node, 'in_file')
 

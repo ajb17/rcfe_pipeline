@@ -100,6 +100,9 @@ if args['derivatives'] is not None:
     data_grabber_node.inputs.drop_blank_outputs = True
     data_grabber_node.inputs.field_template = temps_dict
     data_grabber_node.inputs.template_args = temp_args_dict
+    # print(temp_args_dict)
+    # Exception("this")
+    # print('\n\n here \n\n\n\nn\n\n')
     data_grabber_node.iterables = [ (  key,
                                        [thing.rstrip('\n') for thing in open(template_arguments[key], 'r')]
                                     )

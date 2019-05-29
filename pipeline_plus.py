@@ -15,6 +15,7 @@ import numpy as np
 import nipype.interfaces.io as nio
 from nipype.interfaces.io import BIDSDataGrabber
 from bids import BIDSLayout
+from nipype import DataGrabber
 
 
 ap = argparse.ArgumentParser()
@@ -39,11 +40,13 @@ ap.add_argument('-acq', '--acquisition', required=False, help='The acquisition t
 ap.add_argument('-task', '--task', required=False, help='The task to look for in both T1 and fmri files')
 ap.add_argument('-all', '--show_all', required=False, help='Write out all intermediate files')
 
-ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze')
+ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze (a text file for now)')
 ap.add_argument('-r', '--results_dir', required=False, help='The directory that you want to write results to')
 ap.add_argument('-p', '--processes', required=False, type=int, default=5, help='The amount of processes you want to dedicate to the process')
-ap.add_argument('-g', '--draw_graphs', required=False, default=False, type=bool, help='Wether you want to have the graphs drawn out or not')
-ap.add_argument('-b', '--bias_correction', required=False, type=bool, default=True, help="Wether you want the N4 bias correction step or not ...")
+ap.add_argument('-g', '--draw_graphs', required=False, default='False', type=bool, help='Wether you want to have the graphs drawn out or not')
+ap.add_argument('-b', '--bias_correction', required=False, default='True', help="Wether you want the N4 bias correction step or not ...")
+ap.add_argument('-test', '--test', required=False, default='False')
+#TODO: I think that ardgparse might read my False as "False", so i had to manually change the default here to get my test working
 args = vars(ap.parse_args())
 
 
@@ -82,46 +85,84 @@ else:
 
 query = { 'time_series' : time_series_params, 'struct' : struct_params}
 
-layout = BIDSLayout(args['directory'])
+
+accept_input = Workflow(name='take_input')
+
+def unlist(time_series=None, struct=None):
+    #print(struct)
+    print('\n\n\n ______________     time_series ___________________ \n\n\n')
+    print(time_series)
+    print('\n\n\n _____________________ struct __________________ \n\n\n')
+    print(struct)
+    #TODO: this type checking is a weird artifact of the wrapping done by the bids datagrabber. we should restructuer the code so that a value that is not already in a list doesnt even have to go throught this function
+    if type(time_series) is not list and type(struct) is not list:
+        return time_series, struct
+    return time_series[0], struct[0] #TODO: why the fisrt element only? is it a list wrapped list?
+file_unwrapper_node = Node(Function(function=unlist, output_names=['time_series', 'struct']), name='file_unwrapper')
+
+if str(args['test']) != 'True':
+    layout = BIDSLayout(args['directory'])
 
 #TODO: eliminate search paths before files are created and resoruces are wasted
 
 
+    file_grabber_node = Node(BIDSDataGrabber(), name="file_grabber")
+    file_grabber_node.inputs.base_dir = args['directory']
+    file_grabber_node.inputs.output_query = query
 
-file_grabber_node = Node(BIDSDataGrabber(), name="file_grabber")
-file_grabber_node.inputs.base_dir = args['directory']
-file_grabber_node.inputs.output_query = query
 
+    if args['subject'] is not None:
+       # file_grabber.iterables = ('subject', layout.get_subjects())#file_grabber.inputs.subject = 'M10999905'#args['subject']
+        file_grabber_node.iterables = ('subject', [args['subject']])
+        #file_grabber.inputs.subject = args['subject']
+    elif args['subjects'] is not None:
+        def get_sub_from_path(path):
+            if path.find('sub') == -1 or path.find('ses') == -1:
+                return path
+                #TODO: this is a temporary patch. need to refactor and direct to this function only if a path is given instead of a stad alone subject
+            return path[path.find('sub-') + 4: path.find('/ses-')]
+        #TODO: what if the subjects are given alone iwhtout a path
+        sub_list = []
+        for line in open(abspath(args['subjects']), 'r'):
+            sub_list.append(get_sub_from_path(line).rstrip())
+        file_grabber_node.iterables = ('subject', sub_list)
+    else:
+        file_grabber_node.iterables = ('subject', layout.get_subjects())
 
-if args['subject'] is not None:
-   # file_grabber.iterables = ('subject', layout.get_subjects())#file_grabber.inputs.subject = 'M10999905'#args['subject']
-    file_grabber_node.iterables = ('subject', [args['subject']])
-    #file_grabber.inputs.subject = args['subject']
-elif args['subjects'] is not None:
-    def get_sub_from_path(path):
-        if path.find('sub') == -1 or path.find('ses') == -1:
-            return path
-            #TODO: this is a temporary patch. need to refactor and direct to this function only if a path is given instead of a stad alone subject
-        return path[path.find('sub-') + 4: path.find('/ses-')]
-    #TODO: what if the subjects are given alone iwhtout a path
-    sub_list = []
-    for line in open(abspath(args['subjects']), 'r'):
-        sub_list.append(get_sub_from_path(line).rstrip())
-    file_grabber_node.iterables = ('subject', sub_list)
+    #if not args.has_key('session') and not:
+
+    #TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
+    # also, there are result files created for these failed iterations rn, but theres no point to the
+    file_grabber_node.inputs.raise_on_empty = False#True
+    accept_input.connect([(file_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 else:
-    file_grabber_node.iterables = ('subject', layout.get_subjects())
 
-#if not args.has_key('session') and not:
+    data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, outfields=['time_series', 'struct'], infields=['sub']), name='data_grabber')
+    data_grabber_node.inputs.template = '*'
+    data_grabber_node.inputs.raise_on_empty = False#True
+    data_grabber_node.inputs.drop_blank_outputs = True
+    # /projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii
+    data_grabber_node.inputs.field_template = dict(time_series='/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii', struct='/projects/stan/goff/recon/TYY-%s/t1_to_mni.nii.gz')
+    subs = [i[0:i.find(',')] for i in open('/projects/abeetem/goff_data/goff_data_key.csv', 'r')][2:]
+    print('\n\n')
+    data_grabber_node.inputs.template_args['struct'] =  [['sub']]
+    data_grabber_node.inputs.template_args['time_series'] = [['sub']]
+    data_grabber_node.iterables = [('sub', subs)]
+    print('\n\n\n\n')
+    print(data_grabber_node.iterables)
+    accept_input.connect([(data_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])] )
+    #[('sub', sub_list), ('ses', ses_list)
 
-#TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
-# also, there are result files created for these failed iterations rn, but theres no point to the
-file_grabber_node.inputs.raise_on_empty = False#True
+    #template = abspath(args['template'])
 
+    '/projects/stan/goff/recon/TYY-Ndyx501a/ep2d_bold_TR_300_REST.nii'
+    '/projects/stan/goff/recon/TYY-Ndyx501a/t1_to_mni.nii.gz'
+    print("\n\n 888 \n\n")
 # The BIDSDataGrabber outputs the files inside of a list, but all other nodes only accepts file paths, not lsits
-def unlist(time_series, struct):
-    print(struct)
-    return time_series[0], struct[0]
-file_unwrapper_node = Node(Function(function=unlist, output_names=['time_series', 'struct']), name='file_unwrapper')
+# def unlist(time_series, struct):
+#     #print(struct)
+#     return time_series[0], struct[0] #TODO: why the fisrt element only? is it a list wrapped list?
+# file_unwrapper_node = Node(Function(function=unlist, output_names=['time_series', 'struct']), name='file_unwrapper')
 
 
 
@@ -129,8 +170,6 @@ if args['t1_temp'] is not None:
     template = os.path.abspath(args['t1_temp'])
 else:
     template = os.path.abspath(args['epi_temp'])
-    #template = ""
-    print("set up other temp")
 
 """
 Inputs:
@@ -217,16 +256,49 @@ iso_smooth_node = Node(IsotropicSmooth(fwhm=4, output_type="NIFTI"), name='isoSm
 
 data_sink_node = Node(nio.DataSink(base_directory="results_dir", container='warp152_output', infields=['tt']),
                       name='dataSink')
+# accept_input = Workflow(name='take_input')
 
+# if str(args['test']) == 'True':
+#
+#    # temp_args = args['template_arguments']
+#     # This formats the above list into a dictionary where we can much more easily associate keywords to their lists
+#     #template_arguments = {temp_args[::2][i]: temp_args[1::2][i] for i in range(len(temp_args) / 2)} #TODO: is this dictionary comprehension too much?
+#
+#     data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, outfields=['epi', 't1']), name='data_grabber')
+#     data_grabber_node.inputs.template = '*'
+#     data_grabber_node.inputs.raise_on_empty = True
+#     data_grabber_node.inputs.drop_blank_outputs = True
+#     data_grabber_node.inputs.field_template = dict(epi='/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii', t1='/projects/stan/goff/recon/TYY-%s/t1_to_mni.nii.gz')
+#     data_grabber_node.inputs.template_args = [i[0:i.find(',')] for i in open('/projects/abeetem/goff_data/goff_data_key.csv', 'r')][2:]
+#
+#     accept_input.connect([(data_grabber_node, file_unwrapper_node), [('time_series', 'time_series'), ('struct', 'struct')]] )
+#     #[('sub', sub_list), ('ses', ses_list)]
+#
+#     #template = abspath(args['template'])
+#
+#     '/projects/stan/goff/recon/TYY-Ndyx501a/ep2d_bold_TR_300_REST.nii'
+#     '/projects/stan/goff/recon/TYY-Ndyx501a/t1_to_mni.nii.gz'
+#     print("\n\n 888 \n\n")
 
-accept_input = Workflow(name='take_input')
-accept_input.connect([(file_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])])
-
+# else:
+#     accept_input.connect([(file_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 make_rcfe = Workflow(name='make_rcfe')
 make_rcfe.connect(mcflirt_node, 'out_file', mean_fmri_node, 'in_file')
 make_rcfe.connect(mean_fmri_node, 'out_file', bet_fmri_node, 'in_file')
-make_rcfe.connect(mean_fmri_node, 'out_file', rcfe_node, 'input_image')
+# make_rcfe.connect(mean_fmri_node, 'out_file', rcfe_node, 'input_image') #TODO: uncomment this, and disconect N4bias from rcfe node later
 make_rcfe.connect(bet_fmri_node, 'mask_file', rcfe_node, 'mask_image')
+# make_rcfe.connect(bet_fmri_node)
+if args['bias_correction'] is 'True':
+    make_rcfe.connect(bet_fmri_node, 'mask_file', bias_correction_node, 'mask_image')
+    make_rcfe.connect(bet_fmri_node, 'out_file', bias_correction_node, 'input_image')
+    # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
+    # fullprocess.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
+    #NEW
+    # make_rcfe.connect(bias_correction_node, 'output_image', make_rcfe, 'rcfe.input_image')
+    make_rcfe.connect(bias_correction_node, 'output_image', rcfe_node, 'input_image')
+    print('true facts')
+else:
+    make_rcfe.connect(mean_fmri_node, 'out_file', rcfe_node, 'input_image') #TODO: uncomment this, and disconect N4bias from rcfe node later
 
 
 
@@ -262,8 +334,11 @@ if args['t1_temp'] is not None:
 else:
     base_dir_string = base_dir_string + '/epi_reg'
 
+
+
 base_dir = os.path.abspath(base_dir_string)
 full_process = Workflow(name='full_process', base_dir=base_dir)
+
 if args['t1_temp'] is not None:
     full_process.connect([(accept_input, make_rcfe, [('file_unwrapper.time_series', 'mcflirt.in_file')]),
                       (make_rcfe, get_transforms, [('bet_fmri.out_file', 'flirt.in_file')]),
@@ -277,11 +352,12 @@ if args['t1_temp'] is not None:
 else:
     full_process.connect(accept_input, 'file_unwrapper.time_series', make_rcfe, 'mcflirt.in_file')
     #TODO: make this bias correctin optional
-    if args['bias_correction']:
-        full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction_node, 'mask_image')
-        full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction_node, 'input_image')
-        # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
-        full_process.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
+    if args['bias_correction'] is 'True':
+        # full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction_node, 'mask_image')
+        # full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction_node, 'input_image')
+        # # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
+        # full_process.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
+        full_process.connect(make_rcfe, 'bias_correction.output_image', get_transforms, 'fmri_to_temp.input_image')
     else:
         full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
     full_process.connect(make_rcfe, 'rcfe.output_image', get_transforms, 'apply_epi_transforms.input_image')
@@ -290,9 +366,15 @@ else:
 
 
 full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
-if args['draw_graphs']:
+
+
+if str(args['draw_graphs']) == 'True':
     if args['t1_temp'] is not None:
-        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_T1', format='svg')
+        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_T1_goff2', format='svg')
     else:
-        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_epi', format='svg')
+        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_epi_goff2_colored', format='svg')
+        full_process.write_graph(graph2use='flat', dotfilename='./full_process_graph_epi_goff2', format='svg')
+else:
+    print(args['draw_graphs'])
+
 

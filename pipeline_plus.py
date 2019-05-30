@@ -18,10 +18,11 @@ from bids import BIDSLayout
 from nipype import DataGrabber
 
 
+
 ap = argparse.ArgumentParser()
 ap.add_argument('-sub', '--subject', required=False, help='You can specify a single subject to analyze here')
 
-group = ap.add_mutually_exclusive_group(required=True)
+group = ap.add_mutually_exclusive_group(required=False)
 group.add_argument('-t1_temp', '--t1_temp', help='The path to the template you are fitting your images to')
 group.add_argument('-epi_temp', '--epi_temp', help='The path the a premade template that can fit an fmri time series to a structural space')
 
@@ -89,11 +90,6 @@ query = { 'time_series' : time_series_params, 'struct' : struct_params}
 accept_input = Workflow(name='take_input')
 
 def unlist(time_series=None, struct=None):
-    #print(struct)
-    print('\n\n\n ______________     time_series ___________________ \n\n\n')
-    print(time_series)
-    print('\n\n\n _____________________ struct __________________ \n\n\n')
-    print(struct)
     #TODO: this type checking is a weird artifact of the wrapping done by the bids datagrabber. we should restructuer the code so that a value that is not already in a list doesnt even have to go throught this function
     if type(time_series) is not list and type(struct) is not list:
         return time_series, struct
@@ -112,9 +108,7 @@ if str(args['test']) != 'True':
 
 
     if args['subject'] is not None:
-       # file_grabber.iterables = ('subject', layout.get_subjects())#file_grabber.inputs.subject = 'M10999905'#args['subject']
         file_grabber_node.iterables = ('subject', [args['subject']])
-        #file_grabber.inputs.subject = args['subject']
     elif args['subjects'] is not None:
         def get_sub_from_path(path):
             if path.find('sub') == -1 or path.find('ses') == -1:
@@ -129,7 +123,6 @@ if str(args['test']) != 'True':
     else:
         file_grabber_node.iterables = ('subject', layout.get_subjects())
 
-    #if not args.has_key('session') and not:
 
     #TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
     # also, there are result files created for these failed iterations rn, but theres no point to the
@@ -157,12 +150,9 @@ else:
 
     '/projects/stan/goff/recon/TYY-Ndyx501a/ep2d_bold_TR_300_REST.nii'
     '/projects/stan/goff/recon/TYY-Ndyx501a/t1_to_mni.nii.gz'
-    print("\n\n 888 \n\n")
-# The BIDSDataGrabber outputs the files inside of a list, but all other nodes only accepts file paths, not lsits
-# def unlist(time_series, struct):
-#     #print(struct)
-#     return time_series[0], struct[0] #TODO: why the fisrt element only? is it a list wrapped list?
-# file_unwrapper_node = Node(Function(function=unlist, output_names=['time_series', 'struct']), name='file_unwrapper')
+
+
+
 
 
 
@@ -189,7 +179,7 @@ processing:
                                                                                    -> mat file/txt, image and coff file
 3) apply combined coregistration from fMRI to T1 to MNI Template to rcFe (ANTS);
     apply spatial smoothing (4mm iso gaussian; fslmaths).
-"""
+                                                                                                                          """
 
 # Motion correction on fmri time series
 mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")
@@ -256,32 +246,7 @@ iso_smooth_node = Node(IsotropicSmooth(fwhm=4, output_type="NIFTI"), name='isoSm
 
 data_sink_node = Node(nio.DataSink(base_directory="results_dir", container='warp152_output', infields=['tt']),
                       name='dataSink')
-# accept_input = Workflow(name='take_input')
 
-# if str(args['test']) == 'True':
-#
-#    # temp_args = args['template_arguments']
-#     # This formats the above list into a dictionary where we can much more easily associate keywords to their lists
-#     #template_arguments = {temp_args[::2][i]: temp_args[1::2][i] for i in range(len(temp_args) / 2)} #TODO: is this dictionary comprehension too much?
-#
-#     data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, outfields=['epi', 't1']), name='data_grabber')
-#     data_grabber_node.inputs.template = '*'
-#     data_grabber_node.inputs.raise_on_empty = True
-#     data_grabber_node.inputs.drop_blank_outputs = True
-#     data_grabber_node.inputs.field_template = dict(epi='/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii', t1='/projects/stan/goff/recon/TYY-%s/t1_to_mni.nii.gz')
-#     data_grabber_node.inputs.template_args = [i[0:i.find(',')] for i in open('/projects/abeetem/goff_data/goff_data_key.csv', 'r')][2:]
-#
-#     accept_input.connect([(data_grabber_node, file_unwrapper_node), [('time_series', 'time_series'), ('struct', 'struct')]] )
-#     #[('sub', sub_list), ('ses', ses_list)]
-#
-#     #template = abspath(args['template'])
-#
-#     '/projects/stan/goff/recon/TYY-Ndyx501a/ep2d_bold_TR_300_REST.nii'
-#     '/projects/stan/goff/recon/TYY-Ndyx501a/t1_to_mni.nii.gz'
-#     print("\n\n 888 \n\n")
-
-# else:
-#     accept_input.connect([(file_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 make_rcfe = Workflow(name='make_rcfe')
 make_rcfe.connect(mcflirt_node, 'out_file', mean_fmri_node, 'in_file')
 make_rcfe.connect(mean_fmri_node, 'out_file', bet_fmri_node, 'in_file')
@@ -303,7 +268,7 @@ else:
 
 
 get_transforms = Workflow(name="get_transforms")
-if args['t1_temp']:
+if args['t1_temp'] is not None:
     get_transforms.connect(skullstrip_structural_node, 'out_file', flirt_node, 'reference')
     ### get_transforms.connect(make_rcfe, 'bet_fmri.out_file', flirt, 'in_file')
 
@@ -376,5 +341,4 @@ if str(args['draw_graphs']) == 'True':
         full_process.write_graph(graph2use='flat', dotfilename='./full_process_graph_epi_goff2', format='svg')
 else:
     print(args['draw_graphs'])
-
 

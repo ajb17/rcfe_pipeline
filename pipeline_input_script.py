@@ -17,7 +17,7 @@ from nipype.interfaces.io import BIDSDataGrabber
 from bids import BIDSLayout
 from nipype import DataGrabber
 
-import pipeline_plus as rp
+import rcfe_registration_pipeline as rp
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-sub', '--subject', required=False, help='You can specify a single subject to analyze here')
@@ -147,8 +147,15 @@ else:
 
 
 
-rp.accept_input.connect([(data_grabber_node, rp.file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])])
+rp.accept_input.connect([(data_grabber_node, rp.input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 
 
 # Connect the data grabber node to the input handling node of the registratioin pipline
 rp.full_process.connect()
+
+
+
+
+
+
+

@@ -29,6 +29,7 @@ group.add_argument('-epi_temp', '--epi_temp', help='The path the a premade templ
 #ap.add_argument('-temp', '--temp', required=True, help='The path to the template you are fitting your images to')
 ap.add_argument('-d', '--directory', required=True, help='The directory that your subjects are all found in')
 #TODO: i dont think we need any of these t1 parameters when we ust do the epi to template registration, so we have make these a mutually exclusive group somehwo
+
 ap.add_argument('-t-ses', '--t1-session', required=False, help='The specific session you are looking for for t1 images')
 ap.add_argument('-t-acq', '--t1-acquisition', required=False, help='The acquisition to look for in T1 images')
 ap.add_argument('-t-task', '--t1-task', required=False, help='The task to look for in T1 images')
@@ -47,6 +48,11 @@ ap.add_argument('-p', '--processes', required=False, type=int, default=5, help='
 ap.add_argument('-g', '--draw_graphs', required=False, default='False', type=bool, help='Wether you want to have the graphs drawn out or not')
 ap.add_argument('-b', '--bias_correction', required=False, default='True', help="Wether you want the N4 bias correction step or not ...")
 ap.add_argument('-test', '--test', required=False, default='False')
+
+ap.add_argument('-ef', '--epi_images_format', required=False)
+ap.add_argument('-tf', '--t1_image_format', required=False)
+ap.add_argument('-tfa', '--t1_args', required=False)
+ap.add_argument('-efa', '--epi_args', required=False)
 #TODO: I think that ardgparse might read my False as "False", so i had to manually change the default here to get my test working
 args = vars(ap.parse_args())
 
@@ -89,12 +95,18 @@ query = { 'time_series' : time_series_params, 'struct' : struct_params}
 
 accept_input = Workflow(name='take_input')
 
-def unlist(time_series=None, struct=None):
-    #TODO: this type checking is a weird artifact of the wrapping done by the bids datagrabber. we should restructuer the code so that a value that is not already in a list doesnt even have to go throught this function
+# def unlist(time_series=None, struct=None):
+#     #TODO: this type checking is a weird artifact of the wrapping done by the bids datagrabber. we should restructuer the code so that a value that is not already in a list doesnt even have to go throught this function
+#     if type(time_series) is not list and type(struct) is not list:
+#         return time_series, struct
+#     return time_series[0], struct[0] #TODO: why the fisrt element only? is it a list wrapped list?
+
+def handle_input_files(time_series=None, struct=None):
     if type(time_series) is not list and type(struct) is not list:
         return time_series, struct
-    return time_series[0], struct[0] #TODO: why the fisrt element only? is it a list wrapped list?
-file_unwrapper_node = Node(Function(function=unlist, output_names=['time_series', 'struct']), name='file_unwrapper')
+    # The BIDSDatagrabber resulted in a list containing a list, this jsut remove the wrapping list
+    return time_series[0], struct[0]
+input_handler_node = Node(Function(function=handle_input_files, output_names=['time_series', 'struct']), name='input_handler')
 
 if str(args['test']) != 'True':
     layout = BIDSLayout(args['directory'])
@@ -127,7 +139,7 @@ if str(args['test']) != 'True':
     #TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
     # also, there are result files created for these failed iterations rn, but theres no point to the
     file_grabber_node.inputs.raise_on_empty = False#True
-    accept_input.connect([(file_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])])
+    accept_input.connect([(file_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 else:
 
     data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, outfields=['time_series', 'struct'], infields=['sub']), name='data_grabber')
@@ -135,15 +147,23 @@ else:
     data_grabber_node.inputs.raise_on_empty = False#True
     data_grabber_node.inputs.drop_blank_outputs = True
     # /projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii
-    data_grabber_node.inputs.field_template = dict(time_series='/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii', struct='/projects/stan/goff/recon/TYY-%s/t1_to_mni.nii.gz')
-    subs = [i[0:i.find(',')] for i in open('/projects/abeetem/goff_data/goff_data_key.csv', 'r')][2:]
+    #TODO: Hardcoded
+
+    # time_series_format = '/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii'
+    # struct_format = '/projects/stan/goff/recon/TYY-%s/t1_to_mni.nii.gz'
+    time_series_format = args['t1_images_format']
+    struct_format = args['epi_images_format']
+
+    data_grabber_node.inputs.field_template = dict(time_series=time_series_format, struct=struct_format)
+    subs = [i[0:i.find(',')] for i in open('/projects/abeetem/goff_data/goff_data_key.csv', 'r')][2:7]
+
     print('\n\n')
     data_grabber_node.inputs.template_args['struct'] =  [['sub']]
     data_grabber_node.inputs.template_args['time_series'] = [['sub']]
     data_grabber_node.iterables = [('sub', subs)]
     print('\n\n\n\n')
     print(data_grabber_node.iterables)
-    accept_input.connect([(data_grabber_node, file_unwrapper_node, [('time_series', 'time_series'), ('struct', 'struct')])] )
+    accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
     #[('sub', sub_list), ('ses', ses_list)
 
     #template = abspath(args['template'])
@@ -303,17 +323,17 @@ base_dir = os.path.abspath(base_dir_string)
 full_process = Workflow(name='full_process', base_dir=base_dir)
 
 if args['t1_temp'] is not None:
-    full_process.connect([(accept_input, make_rcfe, [('file_unwrapper.time_series', 'mcflirt.in_file')]),
+    full_process.connect([(accept_input, make_rcfe, [('input_handler.time_series', 'mcflirt.in_file')]),
                       (make_rcfe, get_transforms, [('bet_fmri.out_file', 'flirt.in_file')]),
                       (make_rcfe, get_transforms, [('rcfe.output_image', 'coreg_to_struct_space.in_file')]),
-                      (accept_input, get_transforms, [('file_unwrapper.struct', 'warp152.input_image')]),
-                      (accept_input, get_transforms, [('file_unwrapper.struct', 'skullstrip.in_file')]),
-                      (accept_input, get_transforms, [('file_unwrapper.struct', 'coreg_to_struct_space.reference')]),
+                      (accept_input, get_transforms, [('input_handler.struct', 'warp152.input_image')]),
+                      (accept_input, get_transforms, [('input_handler.struct', 'skullstrip.in_file')]),
+                      (accept_input, get_transforms, [('input_handler.struct', 'coreg_to_struct_space.reference')]),
                      ])
     full_process.connect(get_transforms, 'coreg_to_template_space.output_image', iso_smooth_node, 'in_file')
 
 else:
-    full_process.connect(accept_input, 'file_unwrapper.time_series', make_rcfe, 'mcflirt.in_file')
+    full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
     #TODO: make this bias correctin optional
     if args['bias_correction'] is 'True':
         # full_process.connect(make_rcfe, 'bet_fmri.mask_file', bias_correction_node, 'mask_image')
@@ -328,15 +348,16 @@ else:
 
 
 
-full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
+# full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
 
 
 if str(args['draw_graphs']) == 'True':
+    graph_name = args['results_dir'] +'/graphs/'
     if args['t1_temp'] is not None:
-        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_T1_goff2', format='svg')
+        full_process.write_graph(graph2use='colored', dotfilename=graph_name +'colored', format='svg')
     else:
-        full_process.write_graph(graph2use='colored', dotfilename='./full_process_graph_epi_goff2_colored', format='svg')
-        full_process.write_graph(graph2use='flat', dotfilename='./full_process_graph_epi_goff2', format='svg')
+        full_process.write_graph(graph2use='colored', dotfilename=graph_name + 'colored', format='svg')
+        full_process.write_graph(graph2use='flat', dotfilename=graph_name + 'flat', format='svg')
 else:
     print(args['draw_graphs'])
 ###

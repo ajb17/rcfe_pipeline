@@ -154,13 +154,6 @@ else:
 
 
 
-
-
-if args['t1_temp'] is not None:
-    template = os.path.abspath(args['t1_temp'])
-else:
-    template = os.path.abspath(args['epi_temp'])
-
 """
 Inputs:
 1) fMRI timeseries
@@ -193,6 +186,11 @@ bet_fmri_node = Node(BET(output_type='NIFTI', mask=True), name="bet_fmri")
 
 # Bias Correct the fmri time series
 bias_correction_node = Node(N4BiasFieldCorrection(), name='bias_correction')
+
+if args['t1_temp'] is not None:
+    template = os.path.abspath(args['t1_temp'])
+else:
+    template = os.path.abspath(args['epi_temp'])
 
 def compute_scFe(input_image, mask_image, invert_sign=True):
     import nibabel as nib

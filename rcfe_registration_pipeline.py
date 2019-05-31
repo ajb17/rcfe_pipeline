@@ -287,25 +287,30 @@ else:
 
 get_transforms = Workflow(name="get_transforms")
 if args['t1_temp'] is not None:
+    '''
     get_transforms.connect(skullstrip_structural_node, 'out_file', flirt_node, 'reference')
     ### get_transforms.connect(make_rcfe, 'bet_fmri.out_file', flirt, 'in_file')
-
     get_transforms.connect(flirt_node, 'out_matrix_file', coreg_to_struct_space_node, 'in_matrix_file')
     ### get_transforms.connect(make_rcfe, 'rcfe.output_image', coreg_to_struct_space, 'in_file')
     get_transforms.connect(coreg_to_struct_space_node, 'out_file', coreg_to_template_space_node, 'input_image')
-    #get_transforms.connect(accept_input, 'file_unwrapper.struct', warp_to_152, 'input_image')
+    '''
     get_transforms.connect([(warp_to_152_node, merge_transforms_node, [('affine_transformation', 'in2'), ('warp_field', 'in1')])])
     get_transforms.connect(merge_transforms_node, 'out', coreg_to_template_space_node, 'transforms')
+    t1_wf = Workflow(name='t1')
+    t1_wf.connect(skullstrip_structural_node, 'out_file', flirt_node, 'reference')
+    t1_wf.connect(flirt_node, 'out_matrix_file', coreg_to_struct_space_node, 'in_matrix_file')
+    # t1_wf.connect(coreg_to_struct_space_node, 'out_file', get_transforms, 'coreg_to_template_space.input_image')
 
+    #get_transforms.connect(accept_input, 'file_unwrapper.struct', warp_to_152, 'input_image')
 else:
     # Second processsing Option
     #TODO: instead of giving the reference imageges immeeadly, we may want to pass them in from the file grabber for more clarity in the diagram
-    reg_fmri_temp = Node(legacy.GenWarpFields(reference_image=template), name='fmri_to_temp')#Registration(fixed_image=template), name='fmri-to-temp')
-    apply_epi_temp = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), name='apply_epi_transforms')
-    merge_epi_transforms = Node(Merge(2), iterfield='in2', name='merge_epi')
+    #reg_fmri_temp = Node(legacy.GenWarpFields(reference_image=template), name='fmri_to_temp')#Registration(fixed_image=template), name='fmri-to-temp')
+    #apply_epi_temp = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), name='apply_epi_transforms')
+    #merge_epi_transforms = Node(Merge(2), iterfield='in2', name='merge_epi')
     #get_transforms_epi = Workflow(name="get_transforms_epi")
-    get_transforms.connect([(reg_fmri_temp, merge_epi_transforms, [('affine_transformation', 'in2'),  ('warp_field', 'in1')])])
-    get_transforms.connect(merge_epi_transforms, 'out', apply_epi_temp, 'transforms')
+    get_transforms.connect([(warp_to_152_node, merge_transforms_node, [('affine_transformation', 'in2'),  ('warp_field', 'in1')])])
+    get_transforms.connect(merge_transforms_node, 'out', coreg_to_template_space_node, 'transforms')
 
 
 # apply_transforms = Workflow(name='apply_transforms')
@@ -324,13 +329,20 @@ full_process = Workflow(name='full_process', base_dir=base_dir)
 
 if args['t1_temp'] is not None:
     full_process.connect([(accept_input, make_rcfe, [('input_handler.time_series', 'mcflirt.in_file')]),
-                      (make_rcfe, get_transforms, [('bet_fmri.out_file', 'flirt.in_file')]),
-                      (make_rcfe, get_transforms, [('rcfe.output_image', 'coreg_to_struct_space.in_file')]),
+                      # (make_rcfe, get_transforms, [('bet_fmri.out_file', 'flirt.in_file')]),
+
+                      (make_rcfe, t1_wf, [('bet_fmri.out_file', 'flirt.in_file')]),
+                      # (make_rcfe, get_transforms, [('rcfe.output_image', 'coreg_to_struct_space.in_file')]),
+                      (make_rcfe, t1_wf, [('rcfe.output_image', 'coreg_to_struct_space.in_file')]),
                       (accept_input, get_transforms, [('input_handler.struct', 'warp152.input_image')]),
-                      (accept_input, get_transforms, [('input_handler.struct', 'skullstrip.in_file')]),
-                      (accept_input, get_transforms, [('input_handler.struct', 'coreg_to_struct_space.reference')]),
+                      # (accept_input, get_transforms, [('input_handler.struct', 'skullstrip.in_file')]),
+                      (accept_input, t1_wf, [('input_handler.struct', 'skullstrip.in_file')]),
+                      # (accept_input, get_transforms, [('input_handler.struct', 'coreg_to_struct_space.reference')]),
+
+                      (accept_input,t1_wf, [('input_handler.struct', 'coreg_to_struct_space.reference')]),
                      ])
     full_process.connect(get_transforms, 'coreg_to_template_space.output_image', iso_smooth_node, 'in_file')
+    full_process.connect(t1_wf,'coreg_to_struct_space.out_file', get_transforms, 'coreg_to_template_space.input_image')
 
 else:
     full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
@@ -340,15 +352,15 @@ else:
         # full_process.connect(make_rcfe, 'bet_fmri.out_file', bias_correction_node, 'input_image')
         # # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
         # full_process.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
-        full_process.connect(make_rcfe, 'bias_correction.output_image', get_transforms, 'fmri_to_temp.input_image')
+        full_process.connect(make_rcfe, 'bias_correction.output_image', get_transforms, 'warp152.input_image')
     else:
-        full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
-    full_process.connect(make_rcfe, 'rcfe.output_image', get_transforms, 'apply_epi_transforms.input_image')
-    full_process.connect(get_transforms, 'apply_epi_transforms.output_image', iso_smooth_node, 'in_file')
+        full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'warp152.input_image')
+    full_process.connect(make_rcfe, 'rcfe.output_image', get_transforms, 'coreg_to_template_space.input_image')
+    full_process.connect(get_transforms, 'coreg_to_template_space.output_image', iso_smooth_node, 'in_file')
 
 
 
-# full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
+full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
 
 
 if str(args['draw_graphs']) == 'True':

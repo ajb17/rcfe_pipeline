@@ -38,7 +38,7 @@ processing:
                                                                                    -> mat file/txt, image and coff file
 3) apply combined coregistration from fMRI to T1 to MNI Template to rcFe (ANTS);
     apply spatial smoothing (4mm iso gaussian; fslmaths).
-                                                                                                                          """
+"""
 
 accept_input = Workflow(name='take_input')
 

@@ -67,7 +67,6 @@ ap.add_argument('-r', '--results_dir', required=False, help='The directory that 
 ap.add_argument('-p', '--processes', required=False, type=int, default=5, help='The amount of processes you want to dedicate to the process')
 ap.add_argument('-g', '--draw_graphs', required=False, default='False', type=bool, help='Wether you want to have the graphs drawn out or not')
 ap.add_argument('-b', '--bias_correction', required=False, default='True', help="Wether you want the N4 bias correction step or not ...")
-ap.add_argument('-test', '--test', required=False, default='False')
 
 ap.add_argument('-ef', '--epi_images_format', required=False)
 ap.add_argument('-tf', '--t1_image_format', required=False)
@@ -114,69 +113,37 @@ query = { 'time_series' : time_series_params, 'struct' : struct_params}
 
 
 
-if str(args['test']) != 'True':
-    layout = BIDSLayout(args['directory'])
+layout = BIDSLayout(args['directory'])
 
 #TODO: eliminate search paths before files are created and resoruces are wasted
 
 
-    data_grabber_node = Node(BIDSDataGrabber(), name="data_grabber")
-    data_grabber_node.inputs.base_dir = args['directory']
-    data_grabber_node.inputs.output_query = query
+data_grabber_node = Node(BIDSDataGrabber(), name="data_grabber")
+data_grabber_node.inputs.base_dir = args['directory']
+data_grabber_node.inputs.output_query = query
 
 
-    if args['subject'] is not None:
-        data_grabber_node.iterables = ('subject', [args['subject']])
-    elif args['subjects'] is not None:
-        def get_sub_from_path(path):
-            if path.find('sub') == -1 or path.find('ses') == -1:
-                return path
-                #TODO: this is a temporary patch. need to refactor and direct to this function only if a path is given instead of a stad alone subject
-            return path[path.find('sub-') + 4: path.find('/ses-')]
-        #TODO: what if the subjects are given alone iwhtout a path
-        sub_list = []
-        for line in open(abspath(args['subjects']), 'r'):
-            sub_list.append(get_sub_from_path(line).rstrip())
-        data_grabber_node.iterables = ('subject', sub_list)
-    else:
-        data_grabber_node.iterables = ('subject', layout.get_subjects())
-
-
-    #TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
-    # also, there are result files created for these failed iterations rn, but theres no point to the
-    data_grabber_node.inputs.raise_on_empty = False#True
-    # accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
+if args['subject'] is not None:
+    data_grabber_node.iterables = ('subject', [args['subject']])
+elif args['subjects'] is not None:
+    def get_sub_from_path(path):
+        if path.find('sub') == -1 or path.find('ses') == -1:
+            return path
+            #TODO: this is a temporary patch. need to refactor and direct to this function only if a path is given instead of a stad alone subject
+        return path[path.find('sub-') + 4: path.find('/ses-')]
+    #TODO: what if the subjects are given alone iwhtout a path
+    sub_list = []
+    for line in open(abspath(args['subjects']), 'r'):
+        sub_list.append(get_sub_from_path(line).rstrip())
+    data_grabber_node.iterables = ('subject', sub_list)
 else:
+    data_grabber_node.iterables = ('subject', layout.get_subjects())
 
-    data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, outfields=['time_series', 'struct'], infields=['sub']), name='data_grabber')
-    data_grabber_node.inputs.template = '*'
-    data_grabber_node.inputs.raise_on_empty = False#True
-    data_grabber_node.inputs.drop_blank_outputs = True
-    # /projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii
-    #TODO: Hardcoded
 
-    # time_series_format = '/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii'
-    # struct_format = '/projects/stan/goff/recon/TYY-%s/t1_to_mni.nii.gz'
-    time_series_format = args['t1_images_format']
-    struct_format = args['epi_images_format']
-
-    data_grabber_node.inputs.field_template = dict(time_series=time_series_format, struct=struct_format)
-    subs = [i[0:i.find(',')] for i in open('/projects/abeetem/goff_data/goff_data_key.csv', 'r')][2:7]
-
-    print('\n\n')
-    data_grabber_node.inputs.template_args['struct'] =  [['sub']]
-    data_grabber_node.inputs.template_args['time_series'] = [['sub']]
-    data_grabber_node.iterables = [('sub', subs)]
-    print('\n\n\n\n')
-    print(data_grabber_node.iterables)
-    #[('sub', sub_list), ('ses', ses_list)
-    # accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
-
-    #template = abspath(args['template'])
-
-    '/projects/stan/goff/recon/TYY-Ndyx501a/ep2d_bold_TR_300_REST.nii'
-    '/projects/stan/goff/recon/TYY-Ndyx501a/t1_to_mni.nii.gz'
-
+#TODO: handle the subjects that dont have the specific session somehiwm i think they are causing jsut edning with a crash rn
+# also, there are result files created for these failed iterations rn, but theres no point to the
+data_grabber_node.inputs.raise_on_empty = False#True
+# accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 
 accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 
@@ -251,3 +218,4 @@ if str(args['draw_graphs']) == 'True':
     full_process.write_graph(graph2use='flat', dotfilename=graph_name + 'flat', format='svg')
 ###
 full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
+

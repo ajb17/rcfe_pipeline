@@ -37,6 +37,7 @@ from rcfe_registration_node_setup import skullstrip_structural_node
 from rcfe_registration_node_setup import rcfe_node
 from rcfe_registration_node_setup import accept_input
 
+import rcfe_registration_config as config
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-sub', '--subject', required=False, help='You can specify a single subject to analyze here')
@@ -178,7 +179,6 @@ else:
     '/projects/stan/goff/recon/TYY-Ndyx501a/t1_to_mni.nii.gz'
 
 
-accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 
 
 """
@@ -200,54 +200,18 @@ processing:
 3) apply combined coregistration from fMRI to T1 to MNI Template to rcFe (ANTS);
     apply spatial smoothing (4mm iso gaussian; fslmaths).
                                                                                                                           """
-if args['t1_temp'] is not None:
+
+accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
+
+if config.registration.name == 't1':
     template_image = os.path.abspath(args['t1_temp'])
+    # import rcfe_registration_t1_pipeline
 else:
     template_image = os.path.abspath(args['epi_temp'])
-make_rcfe.connect(bet_fmri_node)
-if args['bias_correction'] is 'True':
-    make_rcfe.connect(bet_fmri_node, 'mask_file', bias_correction_node, 'mask_image')
-    make_rcfe.connect(bet_fmri_node, 'out_file', bias_correction_node, 'input_image')
-    #NEW;
-    # make_rcfe.connect(bias_correction_node, 'output_image', make_rcfe, 'rcfe.input_image')
-    make_rcfe.connect(bias_correction_node, 'output_image', rcfe_node, 'input_image')
-    print('true facts')
-else:
-    make_rcfe.connect(mean_fmri_node, 'out_file', rcfe_node, 'input_image') #TODO: uncomment this, and disconect N4bias from rcfe node later
+    # import rcfe_registration_epi_pipeline
 
-
-
-
-base_dir_string = args['results_dir']#"/projects/abeetem/results/pipelineplus"
-if args['t1_temp'] is not None:
-    base_dir_string = base_dir_string + '/t1_reg'
-else:
-    base_dir_string = base_dir_string + '/epi_reg'
-
-
-
-base_dir = os.path.abspath(base_dir_string)
-# full_process = Workflow(name='full_process', base_dir=base_dir)
-full_process.base_dir = base_dir
-
-full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
-# full_process.connect(get_transforms, 'coreg_to_template_space.output_image', iso_smooth_node, 'in_file')
-
+# full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
 warp_to_152_node.inputs.reference_image = template_image
 coreg_to_template_space_node.inputs.reference_image = template_image
 
-
-if args['t1_temp'] is not None:
-    import rcfe_registration_t1_pipeline
-else:
-    import rcfe_registration_epi_pipeline
-
-# full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
-
-
-if str(args['draw_graphs']) == 'True':
-    graph_name = args['results_dir'] +'/graphs/'
-    full_process.write_graph(graph2use='colored', dotfilename=graph_name + 'colored', format='svg')
-    full_process.write_graph(graph2use='flat', dotfilename=graph_name + 'flat', format='svg')
-###
 full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})

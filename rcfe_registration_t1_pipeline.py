@@ -37,9 +37,11 @@ from rcfe_registration_node_setup import skullstrip_structural_node
 from rcfe_registration_node_setup import rcfe_node
 from rcfe_registration_node_setup import accept_input
 
+import rcfe_registration_config
 
 # get_transforms.connect([(warp_to_152_node, merge_transforms_node, [('affine_transformation', 'in2'), ('warp_field', 'in1')])])
 # get_transforms.connect(merge_transforms_node, 'out', coreg_to_template_space_node, 'transforms')
+
 t1_wf = Workflow(name='t1')
 t1_wf.connect(skullstrip_structural_node, 'out_file', flirt_node, 'reference')
 t1_wf.connect(flirt_node, 'out_matrix_file', coreg_to_struct_space_node, 'in_matrix_file')
@@ -50,7 +52,7 @@ full_process.connect([
                   (accept_input, get_transforms, [('input_handler.struct', 'warp152.input_image')]),
                   (accept_input, t1_wf, [('input_handler.struct', 'skullstrip.in_file')]),
                   (accept_input,t1_wf, [('input_handler.struct', 'coreg_to_struct_space.reference')]),
-                  (t1_wf, get_transforms, [('coreg_to_struct_space_node.out_file', 'coreg_to_template_space_node.input_image')])
+                  (t1_wf, get_transforms, [('coreg_to_struct_space.out_file', 'coreg_to_template_space.input_image')])
                  ])
 # full_process.connect(t1_wf,'coreg_to_struct_space.out_file', get_transforms, 'coreg_to_template_space.input_image')
 

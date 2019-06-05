@@ -36,12 +36,13 @@ from rcfe_registration_node_setup import skullstrip_structural_node
 from rcfe_registration_node_setup import rcfe_node
 from rcfe_registration_node_setup import accept_input
 
+import rcfe_registration_config as config
 
     # full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
     #TODO: make this bias correctin optional
 # if args['bias_correction'] is 'True':
-bias_correction = True
-if bias_correction:
+# bias_correction = True
+if config.bias_correction:
     full_process.connect(make_rcfe, 'bias_correction.output_image', get_transforms, 'warp152.input_image')
 else:
     full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'warp152.input_image')

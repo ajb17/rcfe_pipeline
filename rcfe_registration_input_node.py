@@ -112,13 +112,10 @@ else:
 
 query = { 'time_series' : time_series_params, 'struct' : struct_params}
 
-
-
 if str(args['test']) != 'True':
     layout = BIDSLayout(args['directory'])
 
 #TODO: eliminate search paths before files are created and resoruces are wasted
-
 
     data_grabber_node = Node(BIDSDataGrabber(), name="data_grabber")
     data_grabber_node.inputs.base_dir = args['directory']

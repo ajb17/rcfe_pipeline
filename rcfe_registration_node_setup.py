@@ -50,6 +50,8 @@ def handle_input_files(time_series=None, struct=None):
     # The BIDSDatagrabber resulted in a list containing a list, this jsut remove the wrapping list
     return time_series[0], struct[0]
 input_handler_node = Node(Function(function=handle_input_files, output_names=['time_series', 'struct']), name='input_handler')
+#TODO: epi registration does not use struct in any way. make sure that no errors occur when a struct file is not provided when doing epi registrations
+
 
 # Motion correction on fmri time series
 mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")

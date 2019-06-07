@@ -2,17 +2,19 @@ import rcfe_registration_config as config
 from nipype import Node
 from nipype import DataGrabber
 #Optional: set custom output directory
-config.results_directory = '/projects/abeetem/results/rcfe_piepline_custom_input_test'
+config.results_directory = '/projects/abeetem/results/rcfe_piepline_custom_input_test3'
 
 # Step 1: Create your data grabbing node, and set up its inputs
-data_grabber_node = Node(DataGrabber(base_directory='/projects/abeetem/goff_data', sort_filelist=True, raise_on_empty=False, outfields=['time_series', 'struct'], infields=['sub']), name='data_grabber')
+data_grabber_node = Node(DataGrabber(base_directory='/projects/abeetem/goff_data', sort_filelist=True, raise_on_empty=False, outfields=['time_series'
+    ]#, 'struct']
+    , infields=['sub']), name='data_grabber')
 data_grabber_node.inputs.template = '*'
 data_grabber_node.inputs.raise_on_empty = False
 data_grabber_node.inputs.drop_blank_outputs = True
-data_grabber_node.inputs.field_template = dict(time_series='/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii', struct='/projects/stan/goff/recond/TYY-%s/t1_to_mni.nii.gz')
+data_grabber_node.inputs.field_template = dict(time_series='/projects/stan/goff/recon/TYY-%s/ep2d_bold_TR_300_REST.nii')#, struct='/projects/stan/goff/recond/TYY-%s/t1_to_mni.nii.gz')
 
 subs = [i[0:i.find(',')] for i in open('/projects/abeetem/goff_data/goff_data_key.csv', 'r')][2:7] # = ['Ndyx501a', 'Ndyx501c', 'Ndyx502a', 'Ndyx503a', 'Ndyx505a']
-data_grabber_node.inputs.template_args['struct'] = [['sub']]
+# data_grabber_node.inputs.template_args['struct'] = [['sub']]
 data_grabber_node.inputs.template_args['time_series'] = [['sub']]
 data_grabber_node.iterables = [('sub', subs)]
 
@@ -27,10 +29,11 @@ from rcfe_registration_node_setup import input_handler_node
 from rcfe_registration_node_setup import accept_input
 
 #Step 3: connect your custom data grabbing nod to the input handling node from the setup file
-accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
+accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series')])])#, ('struct', 'struct')])])
 
 #Step 4: set the template image that your images are being registered to
 rcfe_registration_node_setup.set_template_image('/projects/abeetem/goff_data/epi_template.nii.gz')
 
 #Steo 5: Run the process
+# a = data_grabber_node.run()
 full_process.run('MultiProc', plugin_args={'n_procs': 10})

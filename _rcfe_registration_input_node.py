@@ -235,9 +235,9 @@ coreg_to_template_space_node.inputs.reference_image = template_image
 
 
 if args['t1_temp'] is not None:
-    import rcfe_registration_t1_pipeline
+    import _rcfe_registration_t1_pipeline
 else:
-    import rcfe_registration_epi_pipeline
+    import _rcfe_registration_epi_pipeline
 
 # full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
 

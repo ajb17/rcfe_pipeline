@@ -1,21 +1,13 @@
-import nipype
 import os
-from os.path import abspath
-from nipype import Workflow, Node, MapNode, Function
+from nipype import Workflow, Node, Function
 
-from nipype.interfaces.fsl import MCFLIRT, maths, BET, FLIRT
+from nipype.interfaces.fsl import MCFLIRT, BET, FLIRT
 from nipype.interfaces.fsl.maths import MeanImage, IsotropicSmooth
 from nipype.interfaces.utility import Merge
 from nipype.interfaces.afni import SkullStrip
-from nipype.interfaces.ants import WarpImageMultiTransform, Registration, legacy, ApplyTransforms, N4BiasFieldCorrection
-import argparse
-import nibabel as nib
+from nipype.interfaces.ants import legacy, ApplyTransforms, N4BiasFieldCorrection
 
-import numpy as np
 import nipype.interfaces.io as nio
-from nipype.interfaces.io import BIDSDataGrabber
-from bids import BIDSLayout
-from nipype import DataGrabber
 
 import rcfe_registration_config as config
 
@@ -43,14 +35,18 @@ processing:
 
 accept_input = Workflow(name='take_input')
 
-
 def handle_input_files(time_series=None, struct=None):
+    # return time_series, struct
     if type(time_series) is not list and type(struct) is not list:
         return time_series, struct
     # The BIDSDatagrabber resulted in a list containing a list, this jsut remove the wrapping list
     return time_series[0], struct[0]
+    # if type(time_series) is list and type(time_series[0]) is list and len(time_series) == 1:
+    #     return time_series[0], struct[0]
+    # else:
+    #     raise Exception('The input to this node for time_series and struct should be flat lists')
 input_handler_node = Node(Function(function=handle_input_files, output_names=['time_series', 'struct']), name='input_handler')
-#TODO: epi registration does not use struct in any way. make sure that no errors occur when a struct file is not provided when doing epi registrations
+
 
 
 # Motion correction on fmri time series
@@ -122,6 +118,11 @@ data_sink_node = Node(nio.DataSink(base_directory="results_dir", container='warp
 
 
 def set_template_image(template_image):#, reg_type=config.registration):
+    """
+    Sets the template image used to register the T1 or epi images to in the coregistration nodes.
+    :param template_image: The path of the template image
+    :return:
+    """
     warp_to_152_node.inputs.reference_image = template_image
     coreg_to_template_space_node.inputs.reference_image = template_image
     # config.registration = reg_type
@@ -133,19 +134,6 @@ make_rcfe.connect(mean_fmri_node, 'out_file', bet_fmri_node, 'in_file')
 # make_rcfe.connect(mean_fmri_node, 'out_file', rcfe_node, 'input_image') #TODO: uncomment this, and disconect N4bias from rcfe node later
 make_rcfe.connect(bet_fmri_node, 'mask_file', rcfe_node, 'mask_image')
 # make_rcfe.connect(bet_fmri_node)
-
-# if args['bias_correction'] is 'True':
-#     make_rcfe.connect(bet_fmri_node, 'mask_file', bias_correction_node, 'mask_image')
-#     make_rcfe.connect(bet_fmri_node, 'out_file', bias_correction_node, 'input_image')
-#     # full_process.connect(make_rcfe, 'bet_fmri.out_file', get_transforms, 'fmri_to_temp.input_image')
-#     # fullprocess.connect(bias_correction_node, 'output_image', get_transforms, 'fmri_to_temp.input_image')
-#     #NEW
-#     # make_rcfe.connect(bias_correction_node, 'output_image', make_rcfe, 'rcfe.input_image')
-#     make_rcfe.connect(bias_correction_node, 'output_image', rcfe_node, 'input_image')
-#     print('true facts')
-# else:
-#     make_rcfe.connect(mean_fmri_node, 'out_file', rcfe_node, 'input_image') #TODO: uncomment this, and disconect N4bias from rcfe node later
-
 
 
 if config.bias_correction:
@@ -174,11 +162,10 @@ full_process.connect(get_transforms, 'coreg_to_template_space.output_image', iso
 
 base_dir_string = config.results_directory
 base_dir_string = base_dir_string + '/registration'
-
 base_dir = os.path.abspath(base_dir_string)
 full_process.base_dir = base_dir
+
 # full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
-# full_process.connect(get_transforms, 'coreg_to_template_space.output_image', iso_smooth_node, 'in_file')
 
 accept_input.add_nodes([input_handler_node])
 full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
@@ -204,14 +191,8 @@ else:
     full_process.connect(make_rcfe, 'rcfe.output_image', get_transforms, 'coreg_to_template_space.input_image')
 
 
-
-# accept_input.connect(input_handler_node)
-
 if config.draw_graphs:
     graph_name = config.results_directory +'/graphs/'
     full_process.write_graph(graph2use='colored', dotfilename=graph_name + 'colored', format='svg')
     full_process.write_graph(graph2use='flat', dotfilename=graph_name + 'flat', format='svg')
-'''
-full_process.connect(accept_input, 'input_handler.time_series', make_rcfe, 'mcflirt.in_file')
-'''
 

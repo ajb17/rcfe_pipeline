@@ -1,21 +1,11 @@
-import nipype
 import os
 from os.path import abspath
-from nipype import Workflow, Node, MapNode, Function
+from nipype import Node
 
-from nipype.interfaces.fsl import MCFLIRT, maths, BET, FLIRT
-from nipype.interfaces.fsl.maths import MeanImage, IsotropicSmooth
-from nipype.interfaces.utility import Merge
-from nipype.interfaces.afni import SkullStrip
-from nipype.interfaces.ants import WarpImageMultiTransform, Registration, legacy, ApplyTransforms, N4BiasFieldCorrection
 import argparse
-import nibabel as nib
 
-import numpy as np
-import nipype.interfaces.io as nio
 from nipype.interfaces.io import BIDSDataGrabber
 from bids import BIDSLayout
-from nipype import DataGrabber
 
 
 import rcfe_registration_config as config
@@ -24,12 +14,12 @@ import rcfe_registration_config as config
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-sub', '--subject', required=False, help='You can specify a single subject to analyze here')
+ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze (a text file for now)')
 
 group = ap.add_mutually_exclusive_group(required=False)
 group.add_argument('-t1_temp', '--t1_temp', help='The path to the template you are fitting your images to')
 group.add_argument('-epi_temp', '--epi_temp', help='The path the a premade template that can fit an fmri time series to a structural space')
 
-#ap.add_argument('-temp', '--temp', required=True, help='The path to the template you are fitting your images to')
 ap.add_argument('-d', '--directory', required=True, help='The directory that your subjects are all found in')
 #TODO: i dont think we need any of these t1 parameters when we ust do the epi to template registration, so we have make these a mutually exclusive group somehwo
 
@@ -42,20 +32,17 @@ ap.add_argument('-f-task', '--fmri-task', required=False, help='The task to look
 ap.add_argument('-ses', '--session', required=False, help='The session to look for in both T1 and fmri files')
 ap.add_argument('-acq', '--acquisition', required=False, help='The acquisition to look for in both T1 and fmri files')
 ap.add_argument('-task', '--task', required=False, help='The task to look for in both T1 and fmri files')
+#TODO: make sure no crash occurs when using the general acq,task, ... params and only the epi registration route
 
-ap.add_argument('-subs', '--subjects', required=False, help='An iterable source containing all the subjects to analyze (a text file for now)')
 
 ap.add_argument('-all', '--show_all', required=False, help='Write out all intermediate files')
+#TODO: implement the functionoality to go with this
 
 ap.add_argument('-r', '--results_dir', required=False, help='The directory that you want to write results to')
 ap.add_argument('-p', '--processes', required=False, type=int, default=5, help='The amount of processes you want to dedicate to the process')
-ap.add_argument('-g', '--draw_graphs', required=False, default='False', type=bool, help='Wether you want to have the graphs drawn out or not')
+ap.add_argument('-g', '--draw_graphs', required=False, default='True', type=bool, help='Wether you want to have the graphs drawn out or not')
 ap.add_argument('-b', '--bias_correction', required=False, default='True', help="Wether you want the N4 bias correction step or not ...")
 
-ap.add_argument('-ef', '--epi_images_format', required=False)
-ap.add_argument('-tf', '--t1_image_format', required=False)
-ap.add_argument('-tfa', '--t1_args', required=False)
-ap.add_argument('-efa', '--epi_args', required=False)
 #TODO: I think that ardgparse might read my False as "False", so i had to manually change the default here to get my test working
 args = vars(ap.parse_args())
 
@@ -92,37 +79,24 @@ else:
     if args['fmri_session'] is not None:
         time_series_params['session'] = args['fmri_session']
 
-#TODO: ______________ this is important if you want the other setup of the pipline, and I think it has to occur before importing setup
+#TODO: ___________ this is important if you want the other setup of the pipline, and I think it has to occur before importing setup
 if args['t1_temp'] is not None:
     config.registration = config.Reg.t1
 if args['epi_temp'] is not None:
     config.registration = config.Reg.epi
 if args['results_dir'] is not None:
     config.results_directory = args['results_dir']
+config.set_draw_graphs(args['draw_graphs'])
+if args['bias_correction'] == 'False':
+    config.set_bias_correction(False)
 
 import rcfe_registration_node_setup
 
 from rcfe_registration_node_setup import full_process
-from rcfe_registration_node_setup import get_transforms
-from rcfe_registration_node_setup import make_rcfe
-from rcfe_registration_node_setup import coreg_to_template_space_node
-from rcfe_registration_node_setup import warp_to_152_node
-from rcfe_registration_node_setup import coreg_to_struct_space_node
 from rcfe_registration_node_setup import input_handler_node
-from rcfe_registration_node_setup import merge_transforms_node
-from rcfe_registration_node_setup import bias_correction_node
-from rcfe_registration_node_setup import iso_smooth_node
-from rcfe_registration_node_setup import flirt_node
-from rcfe_registration_node_setup import mcflirt_node
-from rcfe_registration_node_setup import data_sink_node
-from rcfe_registration_node_setup import bet_fmri_node
-from rcfe_registration_node_setup import mean_fmri_node
-from rcfe_registration_node_setup import skullstrip_structural_node
-from rcfe_registration_node_setup import rcfe_node
 from rcfe_registration_node_setup import accept_input
 
 query = { 'time_series' : time_series_params, 'struct' : struct_params}
-
 
 
 layout = BIDSLayout(args['directory'])
@@ -157,8 +131,6 @@ else:
 data_grabber_node.inputs.raise_on_empty = False#True
 # accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
 
-# accept_input.connect([(data_grabber_node, input_handler_node, [('time_series', 'time_series'), ('struct', 'struct')])])
-
 
 """
 Inputs:
@@ -189,8 +161,8 @@ else:
     template_image = os.path.abspath(args['epi_temp'])
 
 rcfe_registration_node_setup.set_template_image(template_image)#, config.Reg.t1)
-# input_handler_node.outputs.template_image = template_image
 
+# a = data_grabber_node.run()
 full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
 
 

@@ -17,7 +17,7 @@ from nipype.interfaces.io import BIDSDataGrabber
 from bids import BIDSLayout
 from nipype import DataGrabber
 
-import rcfe_registration_pipeline as rp
+import _rcfe_registration_pipeline as rp
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-sub', '--subject', required=False, help='You can specify a single subject to analyze here')

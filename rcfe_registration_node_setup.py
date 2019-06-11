@@ -49,19 +49,6 @@ input_handler_node = Node(Function(function=handle_input_files, output_names=['t
 
 
 
-# Motion correction on fmri time series
-mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")
-
-# Compute mean(fslmaths) of the fmri time series
-mean_fmri_node = Node(MeanImage(output_type='NIFTI'), name="meanimage")
-
-# Skull Strip the fmri time series
-bet_fmri_node = Node(BET(output_type='NIFTI', mask=True), name="bet_fmri")
-
-# Bias Correct the fmri time series
-bias_correction_node = Node(N4BiasFieldCorrection(), name='bias_correction')
-
-
 def compute_scFe(input_image, mask_image, invert_sign=True):
     import nibabel as nib
     import numpy as np
@@ -88,10 +75,23 @@ def compute_scFe(input_image, mask_image, invert_sign=True):
     # nib.save(img, "rcfe.nii.gz")
     return path.abspath("rcfe.nii")
 
+# Motion correction on fmri time series
+mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")
+
+# Compute mean(fslmaths) of the fmri time series
+mean_fmri_node = Node(MeanImage(output_type='NIFTI'), name="meanimage")
+
+# Skull Strip the fmri time series
+bet_fmri_node = Node(BET(output_type='NIFTI', mask=True), name="bet_fmri")
+
+# Bias Correct the fmri time series
+bias_correction_node = Node(N4BiasFieldCorrection(), name='bias_correction')
 
 # Returns the relative concentration of brain iron
 rcfe_node = Node(Function(input_names=['input_image', 'mask_image'], output_names=['output_image'], function=compute_scFe),
                  name="rcfe")
+
+
 
 # coregister (skullstripped) mean of the fmri time series to the skull stripped T1 structural
 flirt_node = Node(FLIRT(dof=6), name="flirt", cost='mutualinfo')  # do i have to specify out_matrix_file???
@@ -99,20 +99,24 @@ flirt_node = Node(FLIRT(dof=6), name="flirt", cost='mutualinfo')  # do i have to
 # skullstrip the T1 structural image
 skullstrip_structural_node = Node(SkullStrip(outputtype='NIFTI'), name='skullstrip')
 
-# Warp whole head T1 Structural Image to MNI 152 template
-warp_to_152_node = Node(legacy.GenWarpFields(similarity_metric="CC"), name="warp152")
-
 # coreg_to_struct_space = Node(FLIRT(apply_xfm=True, reference=struct_image, interp="sinc"), name="coreg")
 coreg_to_struct_space_node = Node(FLIRT(apply_xfm=True, interp="sinc", cost='mutualinfo'), name="coreg_to_struct_space")
+
+
+# Warp whole head T1 Structural Image to MNI 152 template
+warp_to_152_node = Node(legacy.GenWarpFields(similarity_metric="CC"), name="warp152")
 
 # coreg_to_template_space_node = Node(ApplyTransforms(reference_image=template, interpolation='BSpline'), name="coreg_to_template_space")
 coreg_to_template_space_node = Node(ApplyTransforms(interpolation='BSpline'), name="coreg_to_template_space")
 
 merge_transforms_node = Node(Merge(2), iterfield=['in2'], name="merge")
 
+
+
 # Spatial smoothing
 iso_smooth_node = Node(IsotropicSmooth(fwhm=4, output_type="NIFTI"), name='isoSmooth')
 
+#TODO: Use the data sink node in the pipeline
 data_sink_node = Node(nio.DataSink(base_directory="results_dir", container='warp152_output', infields=['tt']),
                       name='dataSink')
 

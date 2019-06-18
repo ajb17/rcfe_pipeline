@@ -3,13 +3,35 @@ from datetime import datetime
 from enum import Enum
 Reg = Enum('Reg', 'epi t1')
 
-draw_graphs = True
-bias_correction = True
-results_directory = path.expanduser('~') + '/rce_registration/' + str(datetime.now().isoformat())
-registration = Reg.t1
+# draw_graphs = True
+# bias_correction = True
+# results_directory = path.expanduser('~') + '/rce_registration/' + str(datetime.now().isoformat())
+# registration = Reg.t1
+
+class config_class:
+    def __init__(self):
+        self.draw_graphs = True
+        self.bias_correction = True
+        self.results_directory = path.expanduser('~') + '/rce_registration/' + str(datetime.now().isoformat())
+        self.registration = Reg.t1
+
+config_object = config_class()
 
 def set_draw_graphs(bool):
-    draw_graphs = bool
+    # draw_graphs = bool
+    print('\n\nbool\n\n')
+    print(bool)
+    print(type(bool))
+
+    if bool == 0:
+        # draw_graphs = False
+        config_object.draw_graphs = False
+    elif bool == 1:
+        # draw_graphs = True
+        config_object.draw_graphs = True
+        print('setting true for draw_graphs')
+    else:
+        Exception("Please provide either an integer value of either 1 or 0. 1 to write out graphs. 0 to not write out graphs.")
 
 def set_bias_correction(bool):
     bias_correction = bool
@@ -35,3 +57,4 @@ def reset_defaults():
     bias_correction = True
     results_directory = path.expanduser('~') + '/rce_registration/' + str(datetime.now().isoformat())
     registration = Reg.t1
+

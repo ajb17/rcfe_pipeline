@@ -1,5 +1,5 @@
 import os
-from nipype import Workflow, Node, Function
+from nipype import Workflow, Node, Function, MapNode
 
 from nipype.interfaces.fsl import MCFLIRT, BET, FLIRT
 from nipype.interfaces.fsl.maths import MeanImage, IsotropicSmooth
@@ -9,9 +9,8 @@ from nipype.interfaces.ants import legacy, ApplyTransforms, N4BiasFieldCorrectio
 
 import nipype.interfaces.io as nio
 
-import rcfe_registration_config as config
-
-
+import rcfe_registration_config
+config = rcfe_registration_config.config_object
 
 """
 Inputs:
@@ -35,18 +34,29 @@ processing:
 
 accept_input = Workflow(name='take_input')
 
-def handle_input_files(time_series=None, struct=None):
+def handle_input_files(time_series=[None], struct=[None]):
+    """
+    hanldes files input into the datagrabber nodes. Will return the files, unless they are wrapped in a list
+    :param time_series:
+    :param struct:
+    :return:
+    """
     # return time_series, struct
     if type(time_series) is not list and type(struct) is not list:
         return time_series, struct
-    # The BIDSDatagrabber resulted in a list containing a list, this jsut remove the wrapping list
     return time_series[0], struct[0]
+
+
+
+    # print('time_series here: ')
+    # print(time_series)
+    # return time_series, struct
     # if type(time_series) is list and type(time_series[0]) is list and len(time_series) == 1:
     #     return time_series[0], struct[0]
     # else:
     #     raise Exception('The input to this node for time_series and struct should be flat lists')
 input_handler_node = Node(Function(function=handle_input_files, output_names=['time_series', 'struct']), name='input_handler')
-
+# input_handler_node = MapNode(Function(function=handle_input_files, output_names=['time_series', 'struct']), 'time_series',name='input_handler')
 
 
 def compute_scFe(input_image, mask_image, invert_sign=True):
@@ -77,6 +87,7 @@ def compute_scFe(input_image, mask_image, invert_sign=True):
 
 # Motion correction on fmri time series
 mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), name="mcflirt")
+# mcflirt_node = Node(MCFLIRT(mean_vol=True, output_type='NIFTI'), iterables=['in_file'], name="mcflirt")
 
 # Compute mean(fslmaths) of the fmri time series
 mean_fmri_node = Node(MeanImage(output_type='NIFTI'), name="meanimage")

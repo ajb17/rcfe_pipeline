@@ -1,7 +1,8 @@
-import rcfe_registration_config as config
+import rcfe_registration_config as config_file
 from nipype import Node
 from nipype import DataGrabber
 #Optional: set custom output directory
+config = config_file.config_object
 config.results_directory = '/projects/abeetem/results/rcfe_piepline_custom_input_test3'
 
 # Step 1: Create your data grabbing node, and set up its inputs
@@ -20,7 +21,7 @@ data_grabber_node.iterables = [('sub', subs)]
 
 #TODO: consider just making a function to call to swithc them
 #Optional: if you are using the epi template registraion, (and skipping the t1 registration, set the optioni)
-config.registration = config.Reg.epi
+config.registration = config_file.Reg.epi
 
 #Step 2: Import the pipeline steup file only after setting all the configurations in the pieplines config file
 import rcfe_registration_node_setup

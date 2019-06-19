@@ -55,13 +55,22 @@ struct_params = {"datatype": "anat", "suffix": "T1w", "extensions": ["nii", ".ni
 layout = BIDSLayout(args['directory'])
 data_grabber_node_iterables = []
 
+# def create_data_grabber_params(general_param, epi_param, t1_param):
+#     if args[general_param] is not None:
+#         struct_params[general_param] = args[general_param]
+#         time_series_params[general_param] = args[general_param]
+#     elif args[epi_param] is not None:
+#         time_series_params[general_param] = args[epi_param]
+#     elif args[t1_param] is not None:
+#         struct_params[general_param] = args[t1_param]
+#     else:
+#         data_grabber_node_iterables.append((general_param, layout.))
+
 if args['task'] is not None:
     struct_params['task'] = args['task']
     time_series_params['task'] = args['task']
-
 elif args['fmri_task'] is not None:
     time_series_params['task'] = args['fmri_task']
-
 elif args['t1_task'] is not None:
     struct_params['task'] = args['t1_task']
 else:
@@ -169,7 +178,7 @@ else:
 
 rcfe_registration_node_setup.set_template_image(template_image)#, config.Reg.t1)
 
-# a = data_grabber_node.run()
+# a =data_grabber_node.run()
 full_process.run('MultiProc', plugin_args={'n_procs':args['processes']})
 
 

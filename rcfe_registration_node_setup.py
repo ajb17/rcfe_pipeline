@@ -42,9 +42,19 @@ def handle_input_files(time_series=[None], struct=[None]):
     :return:
     """
     # return time_series, struct
-    if type(time_series) is not list and type(struct) is not list:
-        return time_series, struct
-    return time_series[0], struct[0]
+    if type(time_series) is not list:
+        func = time_series
+    else:
+        func = time_series[0]
+    if type(struct) is not list:
+        anat = struct
+    else:
+        anat = struct[0]
+    return func, anat
+    # if type(time_series) is not list and type(struct) is not list:
+    #     print("\n\n\n other \n\n\n")
+    #     return time_series, struct
+    # return time_series[0], struct[0]
 
 
 

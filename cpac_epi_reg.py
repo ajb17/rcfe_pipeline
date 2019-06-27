@@ -36,11 +36,7 @@ These requirnments can be met in two ways
     
     to provide the values that will be substituted in for each paramter such as sub, you will
     need to provide a list values in the form of a text file
-    
-     
-
 """
-#TODO: provide the option to put the text file link write into the template file itself
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-m', '--mean', required=False, help='The mean image you want to generate trasnforms from')
@@ -50,10 +46,9 @@ ap.add_argument('-b', '--bias', required=False, help='The bias mask image to be 
 
 group = ap.add_mutually_exclusive_group(required=True)
 group.add_argument('-i', '--images', nargs='+', help='The derivative images you want the transfroms applied to')
-group.add_argument('-dt', '--derivatives', help='The text file containg the derivate path templates')
+group.add_argument('-dt', '--derivatives', help='The text file containing the derivate path templates')
 ap.add_argument('-d', '--directory', required=False, help='The directory to searchh for subject, session pairs')
 ap.add_argument('-r', '--results_dir', required=True, help='where to store the results')
-# ap.add_argument('-dt', '--derivatives', required=True, help='The text file containg the derivate path templates')
 ap.add_argument('-ta', '--template_arguments', nargs='*', required=False, help='Associate the variables from your templates with a data source containing each variables values. Should be in the format: Key1 Source1 Key2 Source2 ...')
 ap.add_argument('-p', '--processes', required=False, default=5, type=int, help='How many processes you want to dedicate to this task. Default 5')
 ap.add_argument('-g', '--show_graphs', default=False, required=False, help='Do you want to have the workflow graphs written out? Default: False')
@@ -79,8 +74,7 @@ if args['derivatives'] is not None:
             continue
         key, temp, targs = parse_template_entry(i)
         temps_dict[key] = temp.rstrip("\n")
-        temp_args_dict[unicode(key)] = [[arg.rstrip('\n').lstrip(' ') for arg in targs if arg is not '']]#TODO: I wrapped this in a list for a reason, probably to match something in nipype, but should see if i can remove it, it complicates a few things down the road
-        #TODO: this would probably be a little more efficient to do it as we create the list if possible
+        temp_args_dict[unicode(key)] = [[arg.rstrip('\n').lstrip(' ') for arg in targs if arg is not '']]
 
 
 
@@ -91,7 +85,7 @@ if args['derivatives'] is not None:
 
     temp_args = args['template_arguments']
     # This formats the above list into a dictionary where we can much more easily associate keywords to their lists
-    template_arguments = {temp_args[::2][i]: temp_args[1::2][i] for i in range(len(temp_args) / 2)} #TODO: is this dictionary comprehension too much?
+    template_arguments = {temp_args[::2][i]: temp_args[1::2][i] for i in range(len(temp_args) / 2)}
 
 
     data_grabber_node = Node(DataGrabber(base_directory=args['directory'], sort_filelist=True, raise_on_empty=False, infields=template_arguments.keys(), outfields=[tmp for tmp in temps_dict]), name='data_grabber')
@@ -100,13 +94,10 @@ if args['derivatives'] is not None:
     data_grabber_node.inputs.drop_blank_outputs = True
     data_grabber_node.inputs.field_template = temps_dict
     data_grabber_node.inputs.template_args = temp_args_dict
-    # print(temp_args_dict)
-    # Exception("this")
-    # print('\n\n here \n\n\n\nn\n\n')
     data_grabber_node.iterables = [ (  key,
                                        [thing.rstrip('\n') for thing in open(template_arguments[key], 'r')]
                                     )
-                                    for key in template_arguments.keys()] #TODO: Is nested list comprehenion too much?
+                                    for key in template_arguments.keys()]
                                     #[('sub', sub_list), ('ses', ses_list)]
 
 template = abspath(args['template'])
@@ -117,20 +108,17 @@ merge_transforms_node = Node(Merge(2), iterfield='in2', name='merge_transforms')
 if args['derivatives'] is not None:
     merge_input_files_node = Node(Merge(len(derivatives_names)), name='merge_input_files')
 
-map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, interpolation='BSpline'), iterfield=['input_image'], name='map_apply_node')
+map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, interpolation='BSplne', dimension=3, input_image_type=3 ), iterfield=['input_image'], name='map_apply_node') # When applying 3d transforms to a 4d image, set input_image_type to 3, (setting dimension to 3 was reccomended as well)
 
-transform_images = Workflow(name='cpac_epi_reg', base_dir=args['results_dir'])# base_dir='/projects/abeetem/results/cpac_epi_reg')
+transform_images = Workflow(name='cpac_epi_reg', base_dir=args['results_dir'])
 
 if args['derivatives'] is not None:
-    #TODO: do reho, res, bias mask are all hardcoded here, but they shouldnt be
     if 'bias_mask' in temps_dict:
         transform_images.connect([(data_grabber_node, bias_correction_node, [('bias_mask', 'mask_image')])])
         transform_images.connect([(data_grabber_node, bias_correction_node, [('mean', 'input_image')])])
         transform_images.connect([(bias_correction_node, generate_transforms_node, [('output_image', 'input_image')])])
     else:
-        #TODO: Should I print an indication that no bias mask was used? It didnt have much of an impact on the final results from what i could tell at least
         transform_images.connect([(data_grabber_node, generate_transforms_node, [('mean', 'input_image')])])
-    #TODO: the input images are by the input node, but the
 
     transform_images.connect([(data_grabber_node, merge_input_files_node, [(derivatives_names[i], 'in' +str(i+1)) for i in range(len(derivatives_names))])])
     transform_images.connect([(merge_input_files_node, map_apply_node, [('out', 'input_image')])])
@@ -147,7 +135,7 @@ elif args['mean'] is not None and args['images'] is not None:
 transform_images.connect([(generate_transforms_node, merge_transforms_node, [('affine_transformation', 'in2'), ('warp_field', 'in1')])])
 transform_images.connect(merge_transforms_node, 'out', map_apply_node, 'transforms')
 
-data_sink_node = Node(nio.DataSink(base_directory=args['results_dir'] + 'output'), name='data_sink')
+data_sink_node = Node(nio.DataSink(base_directory=args['results_dir'] + '/output'), name='data_sink')
 transform_images.connect(generate_transforms_node, 'output_file', data_sink_node, 'output_file')
 transform_images.connect(map_apply_node, 'output_image', data_sink_node, 'output_image')
 
@@ -158,7 +146,4 @@ if args['show_graphs']:
     transform_images.write_graph(graph2use='exec', dotfilename='./graphs/cpac_epi_reg_exec', format='svg')
 
 transform_images.run('MultiProc', plugin_args={'n_procs':args['processes']})
-# TODO: The mean image and the bias mask are hard coded values, that must be specified in a text file and they must be name 'mean' and 'bias_mask" exaclty.
-#I need to adjust the rigidity of this, ideally wihtout writing every possible 'bias_mask' 'BiasMask' combination, and wihtout having to create even more text files
-#to hold each no derivative template.
 

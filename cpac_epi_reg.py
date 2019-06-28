@@ -50,7 +50,7 @@ group.add_argument('-dt', '--derivatives', help='The text file containing the de
 ap.add_argument('-d', '--directory', required=False, help='The directory to searchh for subject, session pairs')
 ap.add_argument('-r', '--results_dir', required=True, help='where to store the results')
 ap.add_argument('-ta', '--template_arguments', nargs='*', required=False, help='Associate the variables from your templates with a data source containing each variables values. Should be in the format: Key1 Source1 Key2 Source2 ...')
-ap.add_argument('-p', '--processes', required=False, default=5, type=int, help='How many processes you want to dedicate to this task. Default 5')
+ap.add_argument('-p', '--processes', required=False, default=1, type=int, help='How many processes you want to dedicate to this task. Default 1')
 ap.add_argument('-g', '--show_graphs', default=False, required=False, help='Do you want to have the workflow graphs written out? Default: False')
 parsed_args, unknown = ap.parse_known_args()
 args = vars(parsed_args)
@@ -108,7 +108,7 @@ merge_transforms_node = Node(Merge(2), iterfield='in2', name='merge_transforms')
 if args['derivatives'] is not None:
     merge_input_files_node = Node(Merge(len(derivatives_names)), name='merge_input_files')
 
-map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, interpolation='BSplne', dimension=3, input_image_type=3 ), iterfield=['input_image'], name='map_apply_node') # When applying 3d transforms to a 4d image, set input_image_type to 3, (setting dimension to 3 was reccomended as well)
+map_apply_node = MapNode(interface=ApplyTransforms(reference_image=template, interpolation='BSpline', dimension=3, input_image_type=3 ), iterfield=['input_image'], name='map_apply_node') # When applying 3d transforms to a 4d image, set input_image_type to 3, (setting dimension to 3 was reccomended as well)
 
 transform_images = Workflow(name='cpac_epi_reg', base_dir=args['results_dir'])
 

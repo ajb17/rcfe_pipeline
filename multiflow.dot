@@ -1,5 +1,0 @@
-strict digraph  {
-get_transforms;
-"isoSmooth (fsl)";
-get_transforms -> "isoSmooth (fsl)";
-}

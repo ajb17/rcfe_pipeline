@@ -35,7 +35,7 @@ config = {
     'bias_correction':True,
     'graphs':True,
     'registration':Reg.t1,
-    'results_directory':path.expanduser('~') + '/rce_registration/' + str(datetime.now().isoformat()) + '/registration'
+    'results_directory':path.expanduser('~') + '/rcfe_registration/' + str(datetime.now().isoformat()) + '/registration'
 
 }
 

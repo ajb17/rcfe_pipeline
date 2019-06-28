@@ -1,6 +1,0 @@
-digraph structs {
-node [shape=record];
-fmri_to_templateget_transforms [label="{IN}|{ get_transforms |  |  }|{OUT|<outcoregtotemplatespaceoutputimage> coreg_to_template_space.output_image}"];
-fmri_to_templateisoSmooth [label="{IN|<ininfile> in_file}|{ isoSmooth | fsl |  }|{OUT}"];
-fmri_to_templateget_transforms:outcoregtotemplatespaceoutputimage:e -> fmri_to_templateisoSmooth:ininfile:w;
-}

@@ -104,9 +104,7 @@ elif args['subjects'] is not None:
     def get_sub_from_path(path):
         if path.find('sub') == -1 or path.find('ses') == -1:
             return path
-            #TODO: this is a temporary patch. need to refactor and direct to this function only if a path is given instead of a stad alone subject
         return path[path.find('sub-') + 4: path.find('/ses-')]
-    #TODO: what if the subjects are given alone without a path?
     sub_list = []
     for line in open(abspath(args['subjects']), 'r'):
         sub_list.append(get_sub_from_path(line).rstrip())

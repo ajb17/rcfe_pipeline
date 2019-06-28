@@ -1,13 +1,11 @@
+# Author: Anthony Beetem
 from nipype import Workflow, Node, Function
-
 from nipype.interfaces.fsl import MCFLIRT, BET, FLIRT
 from nipype.interfaces.fsl.maths import MeanImage, IsotropicSmooth
 from nipype.interfaces.utility import Merge
 from nipype.interfaces.afni import SkullStrip
 from nipype.interfaces.ants import legacy, ApplyTransforms, N4BiasFieldCorrection
-
 import nipype.interfaces.io as nio
-
 from datetime import datetime
 from os import path
 from enum import Enum
@@ -120,8 +118,6 @@ warp_to_152_node = Node(legacy.GenWarpFields(similarity_metric="CC"), name="warp
 coreg_to_template_space_node = Node(ApplyTransforms(interpolation='BSpline'), name="coreg_to_template_space")
 
 merge_transforms_node = Node(Merge(2), iterfield=['in2'], name="merge")
-
-
 
 # Spatial smoothing
 iso_smooth_node = Node(IsotropicSmooth(fwhm=4, output_type="NIFTI"), name='isoSmooth')

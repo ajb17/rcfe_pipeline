@@ -1,3 +1,4 @@
+# Author: Anthony Beetem
 import os
 from os.path import abspath
 from nipype import Node
@@ -6,7 +7,7 @@ import argparse
 
 from nipype.interfaces.io import BIDSDataGrabber
 from bids import BIDSLayout
-import rcfe_registration_node_setup as rcfe_setup
+import rcfe_pipeline_setup as rcfe_setup
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-sub', '--subject', required=False, help='Specify a single subject to analyze (To run all subjects, dont specify)')
@@ -87,9 +88,9 @@ if args['draw_graphs'] == 0:
 if args['bias_correction'] == 0:
     rcfe_setup.config['bias_correction'] = False
 
-from rcfe_registration_node_setup import full_process
-from rcfe_registration_node_setup import input_handler_node
-from rcfe_registration_node_setup import accept_input
+from rcfe_pipeline_setup import full_process
+from rcfe_pipeline_setup import input_handler_node
+from rcfe_pipeline_setup import accept_input
 
 query = { 'time_series' : time_series_params, 'struct' : struct_params}
 #TODO: can we eliminate search paths before files are created and resoruces are wasted by the BIDSDatagrabber?

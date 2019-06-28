@@ -1,0 +1,50 @@
+﻿This pipeline is designed to implement the relative concentration of iron (rcFe) method of estimating relative iron content from standard fMRI datasets (https://www.biorxiv.org/content/10.1101/579763v1).
+
+
+The pipeline is mostly held in the rcfe_pipeline_setup[a].py file. The most straightforward way to run the pipeline is through the rcfe_registration_bids_input_node.py, as it allows you to specify arguments for searching for files in BIDS datasets on the command line. The program requires an image in template space, and parameters for bids images that will be transformed into the template space. The parameters are task, acquisition, and sessions which need to be specified for both structural and epi images. 
+
+
+You will need:
+* ANTS (https://stnava.github.io/ANTs/)
+* FSL (https://fsl.fmrib.ox.ac.uk/fsl/fslwiki)
+* AFNI (https://afni.nimh.nih.gov/)
+* Nipype v1.1.9
+* Nibabel v2.4.0
+* Numpy v1.16
+* Scipy v1.2.1
+* EPI template (user-provided, if choosing EPI template option)
+
+
+1. Run “python rcfe_pipeline_bids_input_node.py” with the following arguments
+2. “-d” the BIDS directory you are pulling data from
+3. A template image you are registering images to
+   1. “-epi_temp” for a template image in epi space
+   2. “-t1_temp” for a template image in structural space
+1. “-f-ses”, ‘-f-acq”, “-f-task” for any attributes found in your target epi images
+   1. Leaving one of these arguments blank will treat it as a wildcard, and the program will iterate through all possible options for that argument
+1. “-t-ses”, “-t-acq”, “-t-task” for any attributes found in your target t1 images
+   1. For registrations to epi templates, these arguments are not needed
+1. The subjects you are looking for
+   1. “-sub” and a subject name to run on a single subject
+   2. “-subs” and a file path containing a list of subjects to run
+1. Optional arguments:
+   1. “-r” the directory that your results are written out to
+   2. “-p” how many processors from your system should be dedicated to your pipeline
+   3. “-b” with either a “1” or “0” for whether you want to include the bias correction step in the epi_template registration
+   4. “-g” with either a “1” or “0” for whether you want to have graphs drawn out for you
+
+
+A command will look something like this.
+python rcfe_registraing_bids_input_node.py -f-task rest -f-acq 1400 -sub M10999973 -p 4 -epi_temp /projects/abeetem/new_ds_template.nii.gz -d /projects/bids_warehouse -r /projects/user/results/epi_bids_warehouse_single_new_handler2
+
+
+
+
+For non bids compatible datasets, you need to set up a new data grabbing node in a new script. 
+Connect the new data grabber to the input_handler_node from the rcfe_pipeline_setup.py file. Connect your data grabbers outputs to the time_series and struct inputs of the input_handler_node. Use the set_template_image( template_path ) function to set your template image. Set your configurations in the config dictionary; you can decide whether to included the bias correction step, whether to draw graphs, the output directory for nipype, and the type of registration being performed (Reg.t1 if there is an intermediate registration from the epi image into structural space before template space, or Reg.epi if not). By default the registration type is Reg.t1, and bias correction will be included if the epi registration is run, graphs are drawn out, and the output directory is at ~/rcfe_ / inside a folder labeled by a timestamp of when the pipeline started. Call the setup() function to finalize your pipeline, and finally run the full_process.run() method with whatever execution plugin you need.
+
+
+Note: We have provided an example EPI template created from the NKI Rockland Sample (http://fcon_1000.projects.nitrc.org/indi/enhanced/), created by coregistering the MB_1400 fMRI data from 856 participants’ aged 10-85 years to their T1 anatomical, and then to the MNI152_T1_2mm_brain template image provided with FSL. These images were then merged and averaged to create the new_ds_template.nii.gz provided here. This is not the optimal template for EPI registration; you should create your own template derived from fMRI images using the same protocol for the data that you wish to coregister. 
+
+
+[a]remove 'registration' from docs and script name.

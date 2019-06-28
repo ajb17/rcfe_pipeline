@@ -1,5 +1,4 @@
-#import cpac_epi_reg
-#import tkinter as tk
+
 from tkinter import *
 fields = 'Source Directory', 'Mean Image', 'Template Image', 'Mask Image', 'Derivatives', 'Template Parameters', 'Processes'
 import os

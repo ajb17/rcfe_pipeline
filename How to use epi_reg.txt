@@ -1,0 +1,79 @@
+﻿How to use epi_reg.py:
+
+
+This script is intended to warp a user-defined set of functional MRI derivatives to a common EPI template, bypassing T1 coregistration. This may have certain advantages in reducing susceptibility artefact, and increasing SNR at the group level.  Ideally, the EPI template will be created from EPI images from your protocol coregistered to a template space and averaged across participants. 
+
+
+You will need:
+* Python 2.7
+* Nipype v 1.1.9
+* Argparse v 1.1
+* ANTS (https://stnava.github.io/ANTs/)
+* An EPI template (user provided)
+
+
+The script generates transformation matrices and warp fields by registering each participants’ mean epi image to a user-supplied template image. The program will then apply those transformation matrices to any other images you want to transformed into the template space
+
+
+A call to the program will look something like this:
+python cpac_epi_reg.py -t /projects/abeetem/epi_template.nii.gz 
+-d /projects/cgutierrez/rockland_sample_cpac/All_Outputs/ 
+-r /projects/abeetem/results/cpac_epi_reg8/ 
+-dt /projects/abeetem/cpac_epi_reg/cpac_epi_reg_template_list.txt 
+-ta sub /projects/abeetem/cpac_epi_reg/sub_list.txt ses /projects/abeetem/cpac_epi_reg/ses_list.txt 
+-p 10
+
+
+
+
+This pipeline is meant to be run on structured directories, and therefore works by taking in templated paths, and lists of each parameter that should be iterated through in those templated paths
+
+
+-dt
+You can specify the templates in a text file with the following format:
+[key] = “[template path]”, [param1_key], [param2_key], …
+
+
+Where key is just some label for grouping all the files that fall under this template
+The template path basically a full path, where the parts specific to a certain subject or session are wildcarded with ‘%s’, which will be substituted by your param entries
+
+
+For example, a full path may look like:
+/projects/cgutierrez/M1099999_SES1/mean_functional/_scan_rest_acq-1400/sub-M1099999_ses-SES1_task-rest_acq-1400_bold_calc_resample_volreg_calc_tstat.nii.gz
+
+
+But if we want to generate the equivalent path for each subject and each section, we would enter this into out template path text file like this:
+
+
+mean = ‘/projects/cgutierrez//%s_%s/mean_functional/_scan_rest_acq-1400/sub-%s_ses-%s_task-rest_acq-1400_bold_calc_resample_volreg_calc_tstat.nii.gz’, sub, ses, sub, ses
+
+
+Out text file must contain an entry for a mean image, under the keyword ‘mean’, and it must contain a mask image for N4 bias correction, under the label ‘bias_mask’
+After that you can specify as many templates as you want for having the generated transforms applied to
+-ta
+
+
+For each parameter, or template argument, such as sub or ses, we must have a source of specific values that each is associated with
+For this program we just used another text file that contains a list of the values which might look like:
+M00001
+M00004
+M00007 
+…
+
+
+We associate the parameter keyword in out template with this textfile in the command line after the -ta flag. We type the parameter keyword followed by the text file path, followed by the next parameter keyword followed by its text file path, and so on
+
+
+-t
+We give a full path for the template image that is used in the creation of the transformation matrices in the command line, not in a text file
+
+
+-d
+        This is the top level directory that contains all of the data we are working on
+-r 
+        This is the directory that we want to write all of our outputs to
+-p 
+This flag is used to specify how many processes we want to dedicate to this task. Default is 1
+
+
+Note: We have provided an example EPI template created from the NKI Rockland Sample (http://fcon_1000.projects.nitrc.org/indi/enhanced/), created by coregistering the MB_1400 fMRI data from 856 participants’ aged 10-85 years to their T1 anatomical, and then to the MNI152_T1_2mm_brain template image provided with FSL. These images were then merged and averaged to create the new_ds_template.nii.gz provided here. This is not the optimal template for EPI registration; you should create your own template derived from fMRI images using the same protocol for the data that you wish to coregister.

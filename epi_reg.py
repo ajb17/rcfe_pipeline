@@ -1,3 +1,4 @@
+# Author: Anthony Beetem
 from os.path import abspath
 from nipype import Workflow, Node, MapNode
 from nipype.interfaces.utility import Merge
@@ -98,7 +99,6 @@ if args['derivatives'] is not None:
                                        [thing.rstrip('\n') for thing in open(template_arguments[key], 'r')]
                                     )
                                     for key in template_arguments.keys()]
-                                    #[('sub', sub_list), ('ses', ses_list)]
 
 template = abspath(args['template'])
 bias_correction_node = Node(N4BiasFieldCorrection(), name='bias_correction')
@@ -141,9 +141,9 @@ transform_images.connect(map_apply_node, 'output_image', data_sink_node, 'output
 
 
 if args['show_graphs']:
-    transform_images.write_graph(graph2use='orig', dotfilename='./graphs/cpac_epi_reg_orig', format='svg')
-    transform_images.write_graph(graph2use='colored', dotfilename='./graphs/cpac_epi_reg_colored', format='svg')
-    transform_images.write_graph(graph2use='exec', dotfilename='./graphs/cpac_epi_reg_exec', format='svg')
+    transform_images.write_graph(graph2use='orig', dotfilename=args['results_dir'] + '/graphs/cpac_epi_reg_orig', format='svg')
+    transform_images.write_graph(graph2use='colored', dotfilename=args['results_dir'] + '/graphs/cpac_epi_reg_colored', format='svg')
+    transform_images.write_graph(graph2use='exec', dotfilename=args['results_dir'] + '/graphs/cpac_epi_reg_exec', format='svg')
 
 transform_images.run('MultiProc', plugin_args={'n_procs':args['processes']})
 
